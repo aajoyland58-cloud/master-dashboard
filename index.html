@@ -187,6 +187,7 @@
         <select id="mcMonth" class="msel"></select>
         <button class="btn sm primary" id="mcPdf">⬇ PDF</button>
         <button class="btn sm" id="mcCsv">⬇ CSV</button>
+        <button class="btn sm" id="sumPdf" style="border-color:var(--gold);color:var(--gold);font-weight:700">⬇ All-Platforms Summary</button>
       </div>
     </div>
     <div class="p-body"><div id="mcPrev"></div></div>
@@ -258,7 +259,7 @@ const firebaseConfig={apiKey:"AIzaSyD-master",authDomain:"psx-dashboard-2b391.fi
 let db=null;
 try{ firebase.initializeApp(firebaseConfig); db=firebase.database(); }catch(e){ console.warn('fb',e); }
 const ROOT='masterShared';
-const OWNER_PIN='psx2026';
+const OWNER_PIN='Inam7869';
 
 /* ---------- Platforms ---------- */
 const PLATFORMS=[
@@ -405,9 +406,20 @@ function renderInc(){
 
 /* ---------- monthly closure ---------- */
 function mcMonths(){
-  const set=new Set(); state[active].realized.forEach(r=>{ if(r.date) set.add(String(r.date).slice(0,7)); });
-  set.add(nowYM());
-  return [...set].sort().reverse();
+  const ds=[]; state[active].realized.forEach(r=>{ if(r.date) ds.push(String(r.date).slice(0,7)); });
+  ds.sort();
+  let start = ds.length ? ds[0] : nowYM();
+  // start se current month tak continuous
+  const [sy,sm]=start.split('-').map(Number);
+  const now=new Date(); const ey=now.getFullYear(), em=now.getMonth()+1;
+  const out=[]; let y=sy,m=sm;
+  // agar start current se pehle nahi to kam se kam 6 month peeche se dikhao
+  while(out.length<200 && (y<ey || (y===ey && m<=em))){ out.push(y+'-'+String(m).padStart(2,'0')); m++; if(m>12){m=1;y++;} }
+  if(out.length<6){ // thode months guarantee karo
+    let by=ey,bm=em;
+    while(out.length<6){ bm--; if(bm<1){bm=12;by--;} const k=by+'-'+String(bm).padStart(2,'0'); if(!out.includes(k)) out.push(k); }
+  }
+  return [...new Set(out)].sort().reverse();
 }
 function mcLabel(ym){ const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const [y,m]=ym.split('-'); return M[+m-1]+' '+y; }
 function renderMcMonths(){
@@ -573,6 +585,71 @@ $('mcPdf').onclick=()=>{
     <h3>Closing Inventory — carry-forward (${d.inv.length} pos · ${sym} ${Math.round(d.invTot).toLocaleString()})</h3>
     <table><thead><tr><th>Stock</th><th style="text-align:right">Qty</th><th style="text-align:right">Avg Cost</th><th style="text-align:right">Cost Value</th></tr></thead><tbody>${inv}</tbody></table>
     <div class="foot">Realized = booked profit · Incentive = 5% of realized · Closing inventory carry-forward. Informational only, not investment advice.</div>
+  </body></html>`);
+  w.document.close(); w.focus(); setTimeout(()=>{try{w.print();}catch(e){}},500);
+};
+
+/* ---------- ALL-PLATFORMS SUMMARY PDF (boss ke liye ek hi report) ---------- */
+$('sumPdf').onclick=()=>{
+  const ym=$('mcMonth').value||nowYM();
+  const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const lbl = ym==='all' ? 'All Months' : (M[+ym.split('-')[1]-1]+' '+ym.split('-')[0]);
+  const now=new Date();
+  // per platform compute
+  const rowsHtml = PLATFORMS.map(p=>{
+    const pf=state[p.id].portfolio, rl=state[p.id].realized, sym=p.sym;
+    let inv=0,cur=0; pf.forEach(x=>{ inv+=x.qty*x.cost; cur+=x.qty*((x.cur!=null&&x.cur!=='')?+x.cur:+x.cost); });
+    const unpl=cur-inv;
+    const sells = ym==='all'?rl:rl.filter(r=>String(r.date||'').slice(0,7)===ym);
+    const realM = sells.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
+    const tgt=0.05*inv, inc=realM>0?0.05*realM:0, remain=Math.max(0,tgt-realM);
+    const f=n=>sym+' '+Math.round(n).toLocaleString('en-US');
+    const g=x=>x>=0?'#1a7f37':'#c1121f';
+    return `<tr>
+      <td style="font-weight:700"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.name}</td>
+      <td>${p.ccy}</td>
+      <td style="text-align:right">${f(inv)}</td>
+      <td style="text-align:right">${f(cur)}</td>
+      <td style="text-align:right;color:${g(unpl)}">${unpl>=0?'+':''}${f(unpl)}</td>
+      <td style="text-align:right;color:${g(realM)}">${realM>=0?'+':''}${f(realM)}</td>
+      <td style="text-align:right">${f(tgt)}</td>
+      <td style="text-align:right;color:#c79a2e">${f(remain)}</td>
+      <td style="text-align:right;color:#1a7f37">${f(inc)}</td>
+      <td style="text-align:right">${pf.length}</td>
+    </tr>`;
+  }).join('');
+  // currency subtotals
+  const byCcy={};
+  PLATFORMS.forEach(p=>{
+    const pf=state[p.id].portfolio, rl=state[p.id].realized;
+    let inv=0,cur=0; pf.forEach(x=>{ inv+=x.qty*x.cost; cur+=x.qty*((x.cur!=null&&x.cur!=='')?+x.cur:+x.cost); });
+    const sells = ym==='all'?rl:rl.filter(r=>String(r.date||'').slice(0,7)===ym);
+    const realM=sells.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
+    const c=p.ccy; byCcy[c]=byCcy[c]||{sym:p.sym,inv:0,cur:0,real:0}; byCcy[c].inv+=inv; byCcy[c].cur+=cur; byCcy[c].real+=realM;
+  });
+  const subRows=Object.entries(byCcy).map(([c,v])=>`<tr style="background:#eef2f7;font-weight:700">
+    <td>TOTAL (${c})</td><td>${c}</td>
+    <td style="text-align:right">${v.sym} ${Math.round(v.inv).toLocaleString()}</td>
+    <td style="text-align:right">${v.sym} ${Math.round(v.cur).toLocaleString()}</td>
+    <td style="text-align:right;color:${(v.cur-v.inv)>=0?'#1a7f37':'#c1121f'}">${(v.cur-v.inv)>=0?'+':''}${v.sym} ${Math.round(v.cur-v.inv).toLocaleString()}</td>
+    <td style="text-align:right;color:${v.real>=0?'#1a7f37':'#c1121f'}">${v.real>=0?'+':''}${v.sym} ${Math.round(v.real).toLocaleString()}</td>
+    <td colspan="4"></td></tr>`).join('');
+  const w=window.open('','_blank'); if(!w){alert('Popup allow karein');return;}
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>All-Platforms Summary ${lbl}</title><style>
+    body{font-family:'Segoe UI',Arial;color:#1a1a1a;padding:26px 32px;font-size:12.5px}
+    h1{color:#1a3d6d;font-size:20px;margin:0}.sub{color:#666;font-size:12px;margin:3px 0 14px}
+    table{width:100%;border-collapse:collapse;font-size:11.5px}
+    th,td{border:1px solid #dcdcdc;padding:6px 7px;text-align:left}th{background:#1a3d6d;color:#fff;font-size:10.5px}
+    .foot{color:#999;font-size:10px;margin-top:18px;border-top:1px solid #e2e2e2;padding-top:7px}</style></head><body>
+    <h1>Master Portfolio — All-Platforms Summary</h1>
+    <div class="sub">INAMULLAH ABDULLAH · Month: <b>${lbl}</b> · Generated ${now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+    <table><thead><tr>
+      <th>Platform</th><th>Ccy</th><th style="text-align:right">Invested</th><th style="text-align:right">Current Value</th>
+      <th style="text-align:right">Unrealized P&L</th><th style="text-align:right">Realized (month)</th>
+      <th style="text-align:right">5% Target</th><th style="text-align:right">Target Rem.</th><th style="text-align:right">Incentive</th><th style="text-align:right">Pos</th>
+    </tr></thead><tbody>${rowsHtml}${subRows}</tbody></table>
+    <div class="foot">Har platform apni currency mein (PSX = PKR, baaki USD/USDT). Realized = booked profit · Incentive = 5% of realized · Target = 5% of invested capital.
+    Informational only, not investment advice.</div>
   </body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>{try{w.print();}catch(e){}},500);
 };
