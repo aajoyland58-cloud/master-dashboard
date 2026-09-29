@@ -46,9 +46,14 @@
 
   /* tabs */
   .tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
-  .tab{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:9px 16px;cursor:pointer;font-weight:600;font-size:14px;color:var(--muted)}
-  .tab.act{border-color:var(--accent);color:#fff;background:var(--surface)}
-  .tab small{display:block;font-size:10.5px;color:var(--muted2);font-weight:500}
+  .tabs{display:flex;gap:10px;margin:14px 0;flex-wrap:wrap}
+  .tab{background:var(--bg2);border:2px solid var(--line);border-radius:12px;padding:13px 22px;cursor:pointer;
+       font-weight:700;font-size:17px;color:var(--text);display:flex;align-items:center;gap:10px;transition:.15s;min-width:120px}
+  .tab:hover{transform:translateY(-1px)}
+  .tab .tdot{width:12px;height:12px;border-radius:50%;flex:none}
+  .tab .tname{line-height:1.1}
+  .tab .tname small{display:block;font-size:11px;color:var(--muted2);font-weight:500;margin-top:2px}
+  .tab.act{color:#fff}
 
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:14px}
   .p-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -257,11 +262,11 @@ const OWNER_PIN='psx2026';
 
 /* ---------- Platforms ---------- */
 const PLATFORMS=[
-  {id:'PSX',name:'PSX',sub:'Pakistan · PKR',ccy:'PKR',sym:'Rs'},
-  {id:'SARWA',name:'Sarwa',sub:'Global · USD',ccy:'USD',sym:'$'},
-  {id:'IBKR',name:'IBKR',sub:'US stocks · USD',ccy:'USD',sym:'$'},
-  {id:'BINANCE',name:'Binance',sub:'Crypto · USDT',ccy:'USDT',sym:'$'},
-  {id:'MUBASHIR',name:'Mubashir',sub:'Global · USD',ccy:'USD',sym:'$'},
+  {id:'PSX',name:'PSX',sub:'Pakistan · PKR',ccy:'PKR',sym:'Rs',color:'#4bd07a'},
+  {id:'SARWA',name:'Sarwa',sub:'Global · USD',ccy:'USD',sym:'$',color:'#2f6bff'},
+  {id:'IBKR',name:'IBKR',sub:'US stocks · USD',ccy:'USD',sym:'$',color:'#e6b84a'},
+  {id:'BINANCE',name:'Binance',sub:'Crypto · USDT',ccy:'USDT',sym:'$',color:'#f0b90b'},
+  {id:'MUBASHIR',name:'Mubashir',sub:'Global · USD',ccy:'USD',sym:'$',color:'#a78bfa'},
 ];
 let active='PSX';
 let canEdit=false;
@@ -280,7 +285,10 @@ function nowYM(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMon
 function toArr(v){ return Array.isArray(v)?v:(v?Object.values(v):[]); }
 
 /* ---------- storage (Firebase per platform) ---------- */
-function key(id,which){ return `${ROOT}/m_${id}_${which}`; }
+function key(id,which){
+  if(id==='PSX') return `psxShared/k_psx_${which}`;   // SAME as live PSX dashboard
+  return `masterShared/m_${id}_${which}`;
+}
 async function save(id,which){
   if(!db) return;
   try{ await db.ref(key(id,which)).set(state[id][which]); }catch(e){ console.warn('save',e); }
@@ -311,9 +319,9 @@ function totals(id){
 /* ---------- overview strip ---------- */
 function renderOverview(){
   $('ovStrip').innerHTML=PLATFORMS.map(p=>{
-    const t=totals(p.id); const sym=p.sym;
-    return `<div class="ovcard ${p.id===active?'act':''}" data-tab="${p.id}">
-      <div class="k"><span class="dot"></span>${p.name}</div>
+    const t=totals(p.id); const sym=p.sym; const on=p.id===active;
+    return `<div class="ovcard ${on?'act':''}" data-tab="${p.id}" style="${on?`border-color:${p.color}`:''}">
+      <div class="k"><span class="dot" style="background:${p.color}"></span>${p.name}</div>
       <div class="v">${sym} ${Math.round(t.cur).toLocaleString('en-US')}</div>
       <div class="pl ${cls(t.pl)}">${t.pl>=0?'+':''}${sym} ${Math.round(t.pl).toLocaleString('en-US')}</div>
     </div>`;
@@ -323,7 +331,14 @@ function renderOverview(){
 
 /* ---------- tabs ---------- */
 function renderTabs(){
-  $('tabBar').innerHTML=PLATFORMS.map(p=>`<div class="tab ${p.id===active?'act':''}" data-tab="${p.id}">${p.name}<small>${p.sub}</small></div>`).join('');
+  $('tabBar').innerHTML=PLATFORMS.map(p=>{
+    const on=p.id===active;
+    const style=on?`border-color:${p.color};background:${p.color}22;`:'';
+    return `<div class="tab ${on?'act':''}" data-tab="${p.id}" style="${style}">
+      <span class="tdot" style="background:${p.color}"></span>
+      <span class="tname">${p.name}<small>${p.sub}</small></span>
+    </div>`;
+  }).join('');
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>setTab(t.dataset.tab));
 }
 function setTab(id){ active=id; renderTabs(); renderAll(); renderOverview(); }
