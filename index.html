@@ -121,6 +121,7 @@
   <div class="ovstrip" id="ovStrip"></div>
   <div class="tabs" id="tabBar"></div>
 
+  <div id="platformView">
   <!-- 5% target -->
   <section class="panel">
     <div class="p-head"><div class="p-title"><span class="bar" style="background:var(--up)"></span>🎯 5% Monthly Target &amp; Incentive <span id="tgtCcy" style="color:var(--muted2);font-weight:500;font-size:12px"></span></div></div>
@@ -152,8 +153,9 @@
         <div class="stat"><div class="k">Total P&L (unrealized)</div><div class="v" id="sPl">—</div></div>
         <div class="stat"><div class="k">Realized P&L (booked)</div><div class="v" id="sRlz">—</div></div>
       </div>
+      <div id="brokerSum" class="summary" style="margin-bottom:12px"></div>
       <div class="scrollx"><table id="pfTable">
-        <thead><tr><th class="l">Stock</th><th>Qty</th><th>Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P/L</th><th>%</th><th class="l">Date</th><th class="owner-only">Actions</th></tr></thead>
+        <thead><tr><th class="l">Stock</th><th>Qty</th><th>Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P/L</th><th>%</th><th class="l">Broker</th><th class="l">Date</th><th class="owner-only">Actions</th></tr></thead>
         <tbody id="pfBody"></tbody>
       </table></div>
       <div class="empty" id="pfEmpty">Abhi koi position nahi. <b>＋ Add Buy</b> se shuru karein.</div>
@@ -187,11 +189,25 @@
         <select id="mcMonth" class="msel"></select>
         <button class="btn sm primary" id="mcPdf">⬇ PDF</button>
         <button class="btn sm" id="mcCsv">⬇ CSV</button>
-        <button class="btn sm" id="sumPdf" style="border-color:var(--gold);color:var(--gold);font-weight:700">⬇ All-Platforms Summary</button>
       </div>
     </div>
     <div class="p-body"><div id="mcPrev"></div></div>
   </section>
+
+  </div><!-- /platformView -->
+
+  <div id="summaryView" class="hide">
+    <section class="panel">
+      <div class="p-head">
+        <div class="p-title"><span class="bar" style="background:var(--gold)"></span>📊 All-Platforms Summary</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="sumMonth" class="msel"></select>
+          <button class="btn sm primary" id="sumPdf2">⬇ Download PDF</button>
+        </div>
+      </div>
+      <div class="p-body"><div class="scrollx"><div id="sumTable"></div></div></div>
+    </section>
+  </div>
 
   <p class="disc">Master Portfolio Dashboard · view-only for management, editable with PIN · multi-platform.
     Realized P&amp;L, Monthly Closure &amp; 5% Target trades se bante hain. Prices manually update hoti hain.
@@ -206,6 +222,7 @@
     <label>Qty *<input id="bQty" type="number" step="any" min="0"></label>
     <label>Buy price *<input id="bCost" type="number" step="any" min="0"></label>
     <label>Current price<input id="bCur" type="number" step="any" min="0"></label>
+    <label>Broker / Platform<input id="bPlat" placeholder="e.g. KTrade / AHL"></label>
     <label>Date<input id="bDate" type="date"></label>
     <label>Notes<input id="bNotes" placeholder="optional"></label>
   </div>
@@ -332,7 +349,7 @@ function renderOverview(){
 
 /* ---------- tabs ---------- */
 function renderTabs(){
-  $('tabBar').innerHTML=PLATFORMS.map(p=>{
+  let html=PLATFORMS.map(p=>{
     const on=p.id===active;
     const style=on?`border-color:${p.color};background:${p.color}22;`:'';
     return `<div class="tab ${on?'act':''}" data-tab="${p.id}" style="${style}">
@@ -340,9 +357,18 @@ function renderTabs(){
       <span class="tname">${p.name}<small>${p.sub}</small></span>
     </div>`;
   }).join('');
+  const sOn=active==='SUMMARY';
+  html+=`<div class="tab ${sOn?'act':''}" data-tab="SUMMARY" style="${sOn?'border-color:var(--gold);background:#e6b84a22;':''}">
+    <span class="tdot" style="background:var(--gold)"></span>
+    <span class="tname">📊 Summary<small>All platforms</small></span></div>`;
+  $('tabBar').innerHTML=html;
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>setTab(t.dataset.tab));
 }
-function setTab(id){ active=id; renderTabs(); renderAll(); renderOverview(); }
+function setTab(id){
+  active=id; renderTabs(); renderOverview();
+  if(id==='SUMMARY'){ $('platformView').classList.add('hide'); $('summaryView').classList.remove('hide'); renderSummary(); }
+  else { $('summaryView').classList.add('hide'); $('platformView').classList.remove('hide'); renderAll(); }
+}
 
 /* ---------- render active platform ---------- */
 function renderAll(){ renderPortfolio(); renderRealized(); renderInc(); renderMcMonths(); updateCcyLabels(); }
@@ -354,6 +380,18 @@ function renderPortfolio(){
   $('sInv').textContent=money(t.inv); $('sCur').textContent=money(t.cur);
   $('sPl').innerHTML=`<span class="${cls(t.pl)}">${t.pl>=0?'+':''}${money(t.pl)}</span>`;
   $('sRlz').innerHTML=`<span class="${cls(t.real)}">${t.real>=0?'+':''}${money(t.real)}</span>`;
+  // broker/sub-account breakdown (group by platform field)
+  const groups={};
+  pf.forEach(p=>{ const g=p.platform||'—'; if(!groups[g])groups[g]={inv:0,cur:0,n:0}; groups[g].inv+=p.qty*p.cost; groups[g].cur+=p.qty*curOf(p); groups[g].n++; });
+  const gk=Object.keys(groups);
+  if(gk.length>1){
+    $('brokerSum').style.display='';
+    $('brokerSum').innerHTML=gk.map(g=>{const v=groups[g],pl=v.cur-v.inv,plp=v.inv?pl/v.inv*100:0;
+      return `<div class="stat"><div class="k">${g} · ${v.n} pos</div>
+        <div class="v" style="font-size:15px">${money(v.cur)}</div>
+        <div style="font-size:12px;font-family:var(--mono)" class="${cls(pl)}">${pl>=0?'+':''}${money(pl)} (${plp>=0?'+':''}${plp.toFixed(1)}%)</div></div>`;
+    }).join('');
+  } else { $('brokerSum').style.display='none'; $('brokerSum').innerHTML=''; }
   if(!pf.length){ $('pfTable').style.display='none'; $('pfEmpty').style.display='block'; return; }
   $('pfTable').style.display=''; $('pfEmpty').style.display='none';
   $('pfBody').innerHTML=pf.map((p,i)=>{
@@ -367,6 +405,7 @@ function renderPortfolio(){
       <td>${money(val)}</td>
       <td class="${cls(pl)}">${pl>=0?'+':''}${money(pl)}</td>
       <td class="${cls(pl)}">${plp>=0?'+':''}${plp.toFixed(1)}%</td>
+      <td class="l" style="font-size:11px;color:var(--muted)">${p.platform||'—'}</td>
       <td class="l">${p.date||'—'}</td>
       <td class="owner-only"><button class="ic" data-sell="${i}">₨↓</button><button class="ic" data-edit="${i}">✎</button><button class="ic del" data-del="${i}">✕</button></td>
     </tr>`;
@@ -465,12 +504,12 @@ let editIdx=-1;
 function buyPrev(){ const q=+$('bQty').value||0,c=+$('bCost').value||0; $('buyPrev').textContent=q&&c?`Invested: ${money(q*c)}`:''; }
 ['bQty','bCost'].forEach(id=>$(id).addEventListener('input',buyPrev));
 $('addBuyBtn').onclick=()=>{ if(!canEdit)return; editIdx=-1; $('buyTitle').textContent='＋ Add Buy';
-  $('bSym').value='';$('bQty').value='';$('bCost').value='';$('bCur').value='';$('bDate').value=todayStr();$('bNotes').value=''; buyPrev(); $('buyModal').classList.add('show'); };
+  $('bSym').value='';$('bQty').value='';$('bCost').value='';$('bCur').value='';$('bPlat').value='';$('bDate').value=todayStr();$('bNotes').value=''; buyPrev(); $('buyModal').classList.add('show'); };
 $('buyCancel').onclick=()=>$('buyModal').classList.remove('show');
 $('buySave').onclick=async()=>{
   const s=$('bSym').value.trim().toUpperCase(),q=+$('bQty').value,c=+$('bCost').value;
   if(!s||!(q>0)||!(c>0)){ alert('Symbol, Qty, Buy price zaroori.'); return; }
-  const rec={s,qty:q,cost:c,cur:($('bCur').value!==''?+$('bCur').value:c),date:$('bDate').value||todayStr(),notes:$('bNotes').value.trim()};
+  const rec={s,qty:q,cost:c,cur:($('bCur').value!==''?+$('bCur').value:c),platform:$('bPlat').value.trim(),date:$('bDate').value||todayStr(),notes:$('bNotes').value.trim()};
   if(editIdx>=0) state[active].portfolio[editIdx]=rec; else state[active].portfolio.push(rec);
   await save(active,'portfolio'); $('buyModal').classList.remove('show'); renderAll();
 };
@@ -481,7 +520,7 @@ $('pfBody').addEventListener('click',async e=>{
   if(!canEdit)return;
   const ed=e.target.closest('[data-edit]'), dl=e.target.closest('[data-del]'), sl=e.target.closest('[data-sell]');
   if(ed){ const i=+ed.dataset.edit; const p=state[active].portfolio[i]; editIdx=i; $('buyTitle').textContent='✎ Edit position';
-    $('bSym').value=p.s;$('bQty').value=p.qty;$('bCost').value=p.cost;$('bCur').value=(p.cur!=null?p.cur:'');$('bDate').value=p.date||'';$('bNotes').value=p.notes||''; buyPrev(); $('buyModal').classList.add('show'); return; }
+    $('bSym').value=p.s;$('bQty').value=p.qty;$('bCost').value=p.cost;$('bCur').value=(p.cur!=null?p.cur:'');$('bPlat').value=p.platform||'';$('bDate').value=p.date||'';$('bNotes').value=p.notes||''; buyPrev(); $('buyModal').classList.add('show'); return; }
   if(dl){ const i=+dl.dataset.del; if(confirm('Ye position delete karein?')){ state[active].portfolio.splice(i,1); await save(active,'portfolio'); renderAll(); } return; }
   if(sl){ sellIdx=+sl.dataset.sell; const p=state[active].portfolio[sellIdx];
     $('sellInfo').textContent=`${p.s} — held ${(+p.qty).toLocaleString('en-US')} @ ${fmt(p.cost)}`;
@@ -589,70 +628,87 @@ $('mcPdf').onclick=()=>{
   w.document.close(); w.focus(); setTimeout(()=>{try{w.print();}catch(e){}},500);
 };
 
-/* ---------- ALL-PLATFORMS SUMMARY PDF (boss ke liye ek hi report) ---------- */
-$('sumPdf').onclick=()=>{
-  const ym=$('mcMonth').value||nowYM();
-  const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const lbl = ym==='all' ? 'All Months' : (M[+ym.split('-')[1]-1]+' '+ym.split('-')[0]);
-  const now=new Date();
-  // per platform compute
-  const rowsHtml = PLATFORMS.map(p=>{
-    const pf=state[p.id].portfolio, rl=state[p.id].realized, sym=p.sym;
-    let inv=0,cur=0; pf.forEach(x=>{ inv+=x.qty*x.cost; cur+=x.qty*((x.cur!=null&&x.cur!=='')?+x.cur:+x.cost); });
-    const unpl=cur-inv;
-    const sells = ym==='all'?rl:rl.filter(r=>String(r.date||'').slice(0,7)===ym);
-    const realM = sells.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
-    const tgt=0.05*inv, inc=realM>0?0.05*realM:0, remain=Math.max(0,tgt-realM);
-    const f=n=>sym+' '+Math.round(n).toLocaleString('en-US');
-    const g=x=>x>=0?'#1a7f37':'#c1121f';
+
+/* ---------- ALL-PLATFORMS SUMMARY ---------- */
+function sumMonthList(){
+  const ds=[]; PLATFORMS.forEach(p=>state[p.id].realized.forEach(r=>{ if(r.date) ds.push(String(r.date).slice(0,7)); }));
+  ds.sort(); let start=ds.length?ds[0]:nowYM();
+  const [sy,sm]=start.split('-').map(Number); const now=new Date(),ey=now.getFullYear(),em=now.getMonth()+1;
+  const out=[]; let y=sy,m=sm; while(out.length<200&&(y<ey||(y===ey&&m<=em))){ out.push(y+'-'+String(m).padStart(2,'0')); m++; if(m>12){m=1;y++;} }
+  let by=ey,bm=em; while(out.length<6){ bm--; if(bm<1){bm=12;by--;} const k=by+'-'+String(bm).padStart(2,'0'); if(!out.includes(k))out.push(k); }
+  return [...new Set(out)].sort().reverse();
+}
+function mLabel(ym){ if(ym==='all')return'All Months'; const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const[a,b]=ym.split('-'); return M[+b-1]+' '+a; }
+function sumRows(ym){
+  return PLATFORMS.map(p=>{
+    const pf=state[p.id].portfolio, rl=state[p.id].realized;
+    let inv=0,cur=0; pf.forEach(x=>{inv+=x.qty*x.cost;cur+=x.qty*((x.cur!=null&&x.cur!=='')?+x.cur:+x.cost);});
+    const sells=ym==='all'?rl:rl.filter(r=>String(r.date||'').slice(0,7)===ym);
+    const realM=sells.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
+    const tgt=0.05*inv;
+    return {p,inv,cur,unpl:cur-inv,realM,tgt,inc:realM>0?0.05*realM:0,remain:Math.max(0,tgt-realM),pos:pf.length};
+  });
+}
+function renderSummary(){
+  const cur=$('sumMonth').value; const list=sumMonthList();
+  $('sumMonth').innerHTML=list.map(m=>`<option value="${m}">${mLabel(m)}</option>`).join('')+`<option value="all">All months</option>`;
+  if(cur&&(list.includes(cur)||cur==='all'))$('sumMonth').value=cur;
+  const ym=$('sumMonth').value||nowYM(); const rows=sumRows(ym);
+  const money0=(sym,n)=>sym+' '+Math.round(n).toLocaleString('en-US');
+  const body=rows.map(r=>{const sym=r.p.sym;
     return `<tr>
-      <td style="font-weight:700"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${p.color};margin-right:6px"></span>${p.name}</td>
-      <td>${p.ccy}</td>
-      <td style="text-align:right">${f(inv)}</td>
-      <td style="text-align:right">${f(cur)}</td>
-      <td style="text-align:right;color:${g(unpl)}">${unpl>=0?'+':''}${f(unpl)}</td>
-      <td style="text-align:right;color:${g(realM)}">${realM>=0?'+':''}${f(realM)}</td>
-      <td style="text-align:right">${f(tgt)}</td>
-      <td style="text-align:right;color:#c79a2e">${f(remain)}</td>
-      <td style="text-align:right;color:#1a7f37">${f(inc)}</td>
-      <td style="text-align:right">${pf.length}</td>
-    </tr>`;
+      <td class="l" style="font-weight:700"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${r.p.color};margin-right:6px"></span>${r.p.name}</td>
+      <td class="l">${r.p.ccy}</td>
+      <td>${money0(sym,r.inv)}</td><td>${money0(sym,r.cur)}</td>
+      <td class="${cls(r.unpl)}">${r.unpl>=0?'+':''}${money0(sym,r.unpl)}</td>
+      <td class="${cls(r.realM)}">${r.realM>=0?'+':''}${money0(sym,r.realM)}</td>
+      <td>${money0(sym,r.tgt)}</td>
+      <td style="color:var(--gold)">${money0(sym,r.remain)}</td>
+      <td class="up">${money0(sym,r.inc)}</td>
+      <td>${r.pos}</td></tr>`;
   }).join('');
   // currency subtotals
-  const byCcy={};
-  PLATFORMS.forEach(p=>{
-    const pf=state[p.id].portfolio, rl=state[p.id].realized;
-    let inv=0,cur=0; pf.forEach(x=>{ inv+=x.qty*x.cost; cur+=x.qty*((x.cur!=null&&x.cur!=='')?+x.cur:+x.cost); });
-    const sells = ym==='all'?rl:rl.filter(r=>String(r.date||'').slice(0,7)===ym);
-    const realM=sells.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
-    const c=p.ccy; byCcy[c]=byCcy[c]||{sym:p.sym,inv:0,cur:0,real:0}; byCcy[c].inv+=inv; byCcy[c].cur+=cur; byCcy[c].real+=realM;
-  });
-  const subRows=Object.entries(byCcy).map(([c,v])=>`<tr style="background:#eef2f7;font-weight:700">
-    <td>TOTAL (${c})</td><td>${c}</td>
-    <td style="text-align:right">${v.sym} ${Math.round(v.inv).toLocaleString()}</td>
-    <td style="text-align:right">${v.sym} ${Math.round(v.cur).toLocaleString()}</td>
-    <td style="text-align:right;color:${(v.cur-v.inv)>=0?'#1a7f37':'#c1121f'}">${(v.cur-v.inv)>=0?'+':''}${v.sym} ${Math.round(v.cur-v.inv).toLocaleString()}</td>
-    <td style="text-align:right;color:${v.real>=0?'#1a7f37':'#c1121f'}">${v.real>=0?'+':''}${v.sym} ${Math.round(v.real).toLocaleString()}</td>
-    <td colspan="4"></td></tr>`).join('');
+  const byC={}; rows.forEach(r=>{const c=r.p.ccy; byC[c]=byC[c]||{sym:r.p.sym,inv:0,cur:0,real:0}; byC[c].inv+=r.inv;byC[c].cur+=r.cur;byC[c].real+=r.realM;});
+  const subs=Object.entries(byC).map(([c,v])=>`<tr style="background:#1b2735;font-weight:700">
+    <td class="l">TOTAL</td><td class="l">${c}</td><td>${v.sym} ${Math.round(v.inv).toLocaleString()}</td><td>${v.sym} ${Math.round(v.cur).toLocaleString()}</td>
+    <td class="${cls(v.cur-v.inv)}">${(v.cur-v.inv)>=0?'+':''}${v.sym} ${Math.round(v.cur-v.inv).toLocaleString()}</td>
+    <td class="${cls(v.real)}">${v.real>=0?'+':''}${v.sym} ${Math.round(v.real).toLocaleString()}</td><td colspan="4"></td></tr>`).join('');
+  $('sumTable').innerHTML=`<table style="min-width:820px"><thead><tr>
+    <th class="l">Platform</th><th class="l">Ccy</th><th>Invested</th><th>Current</th><th>Unrealized</th><th>Realized (mo)</th><th>5% Target</th><th>Remaining</th><th>Incentive</th><th>Pos</th>
+    </tr></thead><tbody>${body}${subs}</tbody></table>`;
+}
+$('sumMonth').onchange=renderSummary;
+
+function generateSummaryPDF(ym){
+  const rows=sumRows(ym), now=new Date();
+  const f=(sym,n)=>sym+' '+Math.round(n).toLocaleString('en-US'), g=x=>x>=0?'#1a7f37':'#c1121f';
+  const body=rows.map(r=>`<tr>
+    <td style="font-weight:700"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${r.p.color};margin-right:6px"></span>${r.p.name}</td>
+    <td>${r.p.ccy}</td><td style="text-align:right">${f(r.p.sym,r.inv)}</td><td style="text-align:right">${f(r.p.sym,r.cur)}</td>
+    <td style="text-align:right;color:${g(r.unpl)}">${r.unpl>=0?'+':''}${f(r.p.sym,r.unpl)}</td>
+    <td style="text-align:right;color:${g(r.realM)}">${r.realM>=0?'+':''}${f(r.p.sym,r.realM)}</td>
+    <td style="text-align:right">${f(r.p.sym,r.tgt)}</td><td style="text-align:right;color:#c79a2e">${f(r.p.sym,r.remain)}</td>
+    <td style="text-align:right;color:#1a7f37">${f(r.p.sym,r.inc)}</td><td style="text-align:right">${r.pos}</td></tr>`).join('');
+  const byC={}; rows.forEach(r=>{const c=r.p.ccy;byC[c]=byC[c]||{sym:r.p.sym,inv:0,cur:0,real:0};byC[c].inv+=r.inv;byC[c].cur+=r.cur;byC[c].real+=r.realM;});
+  const subs=Object.entries(byC).map(([c,v])=>`<tr style="background:#eef2f7;font-weight:700"><td>TOTAL (${c})</td><td>${c}</td>
+    <td style="text-align:right">${v.sym} ${Math.round(v.inv).toLocaleString()}</td><td style="text-align:right">${v.sym} ${Math.round(v.cur).toLocaleString()}</td>
+    <td style="text-align:right;color:${g(v.cur-v.inv)}">${(v.cur-v.inv)>=0?'+':''}${v.sym} ${Math.round(v.cur-v.inv).toLocaleString()}</td>
+    <td style="text-align:right;color:${g(v.real)}">${v.real>=0?'+':''}${v.sym} ${Math.round(v.real).toLocaleString()}</td><td colspan="4"></td></tr>`).join('');
   const w=window.open('','_blank'); if(!w){alert('Popup allow karein');return;}
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>All-Platforms Summary ${lbl}</title><style>
-    body{font-family:'Segoe UI',Arial;color:#1a1a1a;padding:26px 32px;font-size:12.5px}
-    h1{color:#1a3d6d;font-size:20px;margin:0}.sub{color:#666;font-size:12px;margin:3px 0 14px}
-    table{width:100%;border-collapse:collapse;font-size:11.5px}
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>All-Platforms Summary ${ym}</title><style>
+    body{font-family:'Segoe UI',Arial;color:#1a1a1a;padding:26px 32px;font-size:12.5px}h1{color:#1a3d6d;font-size:20px;margin:0}
+    .sub{color:#666;font-size:12px;margin:3px 0 14px}table{width:100%;border-collapse:collapse;font-size:11.5px}
     th,td{border:1px solid #dcdcdc;padding:6px 7px;text-align:left}th{background:#1a3d6d;color:#fff;font-size:10.5px}
     .foot{color:#999;font-size:10px;margin-top:18px;border-top:1px solid #e2e2e2;padding-top:7px}</style></head><body>
     <h1>Master Portfolio — All-Platforms Summary</h1>
-    <div class="sub">INAMULLAH ABDULLAH · Month: <b>${lbl}</b> · Generated ${now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
-    <table><thead><tr>
-      <th>Platform</th><th>Ccy</th><th style="text-align:right">Invested</th><th style="text-align:right">Current Value</th>
-      <th style="text-align:right">Unrealized P&L</th><th style="text-align:right">Realized (month)</th>
-      <th style="text-align:right">5% Target</th><th style="text-align:right">Target Rem.</th><th style="text-align:right">Incentive</th><th style="text-align:right">Pos</th>
-    </tr></thead><tbody>${rowsHtml}${subRows}</tbody></table>
-    <div class="foot">Har platform apni currency mein (PSX = PKR, baaki USD/USDT). Realized = booked profit · Incentive = 5% of realized · Target = 5% of invested capital.
-    Informational only, not investment advice.</div>
+    <div class="sub">INAMULLAH ABDULLAH · Month: <b>${mLabel(ym)}</b> · Generated ${now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+    <table><thead><tr><th>Platform</th><th>Ccy</th><th style="text-align:right">Invested</th><th style="text-align:right">Current</th><th style="text-align:right">Unrealized</th><th style="text-align:right">Realized (mo)</th><th style="text-align:right">5% Target</th><th style="text-align:right">Remaining</th><th style="text-align:right">Incentive</th><th style="text-align:right">Pos</th></tr></thead>
+    <tbody>${body}${subs}</tbody></table>
+    <div class="foot">Har platform apni currency mein. Realized = booked profit · Incentive = 5% of realized · Target = 5% of invested. Informational only, not investment advice.</div>
   </body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>{try{w.print();}catch(e){}},500);
-};
+}
+$('sumPdf2').onclick=()=>generateSummaryPDF($('sumMonth').value||nowYM());
 
 /* ---------- boot ---------- */
 renderTabs(); renderOverview(); renderAll(); subscribe();
