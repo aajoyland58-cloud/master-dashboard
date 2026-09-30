@@ -284,12 +284,88 @@ const PLATFORMS=[
   {id:'SARWA',name:'Sarwa',sub:'Global · USD',ccy:'USD',sym:'$',color:'#2f6bff'},
   {id:'IBKR',name:'IBKR',sub:'US stocks · USD',ccy:'USD',sym:'$',color:'#e6b84a'},
   {id:'BINANCE',name:'Binance',sub:'Crypto · USDT',ccy:'USDT',sym:'$',color:'#f0b90b'},
-  {id:'MUBASHIR',name:'Mubashir',sub:'Global · USD',ccy:'USD',sym:'$',color:'#a78bfa'},
+  {id:'MUBASHER',name:'Mubasher',sub:'Mubasher Capital · USD',ccy:'USD',sym:'$',color:'#a78bfa'},
+];
+const DEFAULT_PSX_TXLOG=[
+  ["2026-03-13","BUY","BAFL",8600,996150.95],
+  ["2026-03-13","BUY","FFC",1900,964171.8],
+  ["2026-03-13","BUY","NBP",4000,985717.4],
+  ["2026-03-13","BUY","OGDC",3500,984884.36],
+  ["2026-03-13","BUY","PPL",4700,996514.96],
+  ["2026-04-22","BUY","OGDC",200,65694.11],
+  ["2026-06-11","BUY","FFC",800,446965.67],
+  ["2026-06-11","BUY","JVDC",600,90759.29],
+  ["2026-06-11","BUY","MCB",700,284651.66],
+  ["2026-06-11","BUY","TPLP",18000,200650.6],
+  ["2026-06-11","BUY","WAVESAPP",10500,100406.25],
+  ["2026-07-13","BUY","ENGROH",1200,350403.48],
+  ["2026-07-13","BUY","SYS",1672,250373.21],
+  ["2026-07-13","BUY","ILP",478,50018.02],
+  ["2026-07-13","BUY","NML",312,49923.98],
+  ["2026-07-13","BUY","FFC",1140,650304.26],
+  ["2026-07-13","BUY","MEBL",910,496004.07],
+  ["2026-07-13","BUY","FCCL",3385,200229.15],
+  ["2026-07-13","BUY","HUBC",2150,500715.67],
+  ["2026-07-13","BUY","OGDC",1799,600983.35],
+  ["2026-07-13","BUY","MCB",360,149293.49],
+  ["2026-07-13","BUY","LUCK",849,400482.02],
+  ["2026-07-13","BUY","UBL",1185,550195.02],
+  ["2026-07-13","BUY","NBP",1720,349417.7],
+  ["2026-07-13","BONUS","BAFL",8600,0],
+  ["2026-07-14","SELL","NBP",4000,816733.44],
+  ["2026-07-14","SELL","BAFL",17200,997509.18],
+  ["2026-07-14","SELL","MCB",700,289094.14],
+  ["2026-07-14","BUY","MEBL",4000,2192586.38],
+  ["2026-07-14","BUY","MEBL",1945,1069636.17],
+  ["2026-07-14","SELL","NBP",1720,355024.91],
+  ["2026-07-14","SELL","MCB",360,148427.13],
+  ["2026-07-14","SELL","UBL",1185,566100],
+  ["2026-07-15","BUY","MIF",12016.7889,2000000],
+  ["2026-07-30","BUY","FFC",266,150149.58],
+  ["2026-07-30","BUY","MLCF",531,49994.79],
+  ["2026-07-30","BUY","OGDC",317,99995.51],
+  ["2026-07-30","BUY","LUCK",170,74748.22],
+  ["2026-07-30","BUY","MARI",192,124822.95],
+  ["2026-08-04","BUY","SEARL",10000,902537.38],
+  ["2026-09-07","SELL","OGDC",3690,1216764.34],
+  ["2026-09-07","SELL","PPL",4690,1057629.46],
+  ["2026-09-07","SELL","TPLP",17990,260090.43],
+  ["2026-09-14","BUY","DGKC",7500,1458096.2],
+  ["2026-09-14","BUY","FFC",2800,1495660.37],
+  ["2026-09-14","BUY","MLCF",15500,1462455.6],
+  ["2026-09-14","BUY","SSGC",21000,497205.05],
+  ["2026-09-18","SELL","MEBL",2855,1574132.68],
+  ["2026-09-21","SELL","DGKC",7500,1477010.36],
+  ["2026-09-21","SELL","FFC",5500,2933828.01],
+  ["2026-09-21","SELL","MEBL",4000,2200577.64],
+  ["2026-09-21","SELL","MLCF",15500,1465394.57],
+  ["2026-09-21","SELL","SSGC",21000,505540.77],
+  ["2026-09-21","BUY","HUBC",2000,409299.26],
+  ["2026-09-21","BUY","MARI",500,318032.69],
+  ["2026-09-21","BUY","POL",600,448372.11],
+  ["2026-09-21","BUY","SOYASUP",3500,109902.11],
+  ["2026-09-22","BUY","INIL",3000,492123],
+  ["2026-09-22","BUY","DGKC",4000,792139],
+  ["2026-09-22","BUY","APL",1000,579002],
+  ["2026-09-22","BUY","OGDC",4000,1275160],
+  ["2026-09-22","BUY","SSGC",25000,598755],
+  ["2026-09-22","BUY","THCCL",5000,384387],
+  ["2026-09-22","BUY","FFC",2500,1351390],
+  ["2026-09-22","BUY","PAEL",13000,479661],
+  ["2026-09-22","BUY","HCAR",1200,269292],
+  ["2026-09-22","BUY","PPL",5000,1146500],
+  ["2026-09-28","BUY","NRL",1000,550753.4],
+  ["2026-09-28","BUY","PSO",1000,351690.6],
+  ["2026-09-28","SELL","INIL",3000,504645.6],
+  ["2026-09-28","SELL","PPL",5010,1157789.4],
+  ["2026-09-28","SELL","SSGC",25000,603087.5],
+  ["2026-09-28","SELL","TPLP",10,123.08],
+  ["2026-09-28","SELL","NRL",1000,568100]
 ];
 let active='PSX';
 let canEdit=false;
 const state={}; // state[id]={portfolio:[],realized:[]}
-PLATFORMS.forEach(p=>state[p.id]={portfolio:[],realized:[]});
+PLATFORMS.forEach(p=>state[p.id]={portfolio:[],realized:[],txlog:[]});
 
 /* ---------- helpers ---------- */
 const $=id=>document.getElementById(id);
@@ -304,7 +380,7 @@ function toArr(v){ return Array.isArray(v)?v:(v?Object.values(v):[]); }
 
 /* ---------- storage (Firebase per platform) ---------- */
 function key(id,which){
-  if(id==='PSX') return `psxShared/k_psx_${which}`;   // SAME as live PSX dashboard
+  if(id==='PSX' && which!=='txlog') return `psxShared/k_psx_${which}`;   // SAME as live PSX dashboard
   return `masterShared/m_${id}_${which}`;
 }
 async function save(id,which){
@@ -314,7 +390,7 @@ async function save(id,which){
 function subscribe(){
   if(!db){ $('syncTxt').textContent='Offline (no sync)'; $('syncDot').style.color='var(--down)'; return; }
   PLATFORMS.forEach(p=>{
-    ['portfolio','realized'].forEach(which=>{
+    ['portfolio','realized','txlog'].forEach(which=>{
       db.ref(key(p.id,which)).on('value',snap=>{
         state[p.id][which]=toArr(snap.val());
         if(p.id===active) renderAll(); renderOverview();
@@ -473,29 +549,65 @@ function renderMcMonths(){
   if(cur && (list.includes(cur)||cur==='all')) $('mcMonth').value=cur;
   renderMcPrev();
 }
-function mcData(ym){
+function mcFromTxlog(ym){
+  const tx=(state[active].txlog||[]).slice().sort((a,b)=> a[0]===b[0]?((a[1]==='SELL'?1:0)-(b[1]==='SELL'?1:0)):(a[0]<b[0]?-1:1));
+  const inv={}; const val=()=>Object.values(inv).reduce((s,v)=>s+(v.q>1e-9?v.c:0),0);
+  let opening=0,buysM=0,sellVal=0,realM=0,openCap=(ym==='all'); const sells=[];
+  for(const t of tx){
+    const [d,act,sym,qty,amt]=t; const mo=String(d).slice(0,7);
+    if(ym!=='all' && !openCap && mo>=ym){ opening=val(); openCap=true; }
+    if(ym!=='all' && mo>ym) break;
+    const k=sym; if(!inv[k])inv[k]={q:0,c:0};
+    const inM=(ym==='all')||(mo===ym);
+    if(act==='BUY'){ inv[k].q+=qty; inv[k].c+=amt; if(inM)buysM+=amt; }
+    else if(act==='BONUS'){ inv[k].q+=qty; }
+    else if(act==='SELL'){ const avg=inv[k].q>0?inv[k].c/inv[k].q:0,co=avg*qty; inv[k].q-=qty; inv[k].c-=co;
+      if(inM){ realM+=amt-co; sellVal+=amt; sells.push({date:d,s:sym,qty,cost:avg,sell:amt/qty,pnl:amt-co}); } }
+  }
+  const closing=val();
+  const invList=Object.entries(inv).filter(([k,v])=>v.q>1e-9).map(([k,v])=>({s:k,qty:v.q,cost:v.c/v.q,val:v.c})).sort((a,b)=>b.val-a.val);
+  // realized/sellVal realized-array se (broker-correct)
   const rl=state[active].realized;
+  const rsel=ym==='all'?rl.slice():rl.filter(r=>String(r.date||'').slice(0,7)===ym);
+  const realM2=rsel.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
+  const sellVal2=rsel.reduce((a,r)=>a+r.sell*r.qty,0);
+  const cap=closing, tgt=0.05*cap;
+  return {sells:rsel,realM:realM2,sellVal:sellVal2,buysM,opening,closing,cap,tgt,inc:realM2>0?0.05*realM2:0,remain:Math.max(0,tgt-realM2),inv:invList,invTot:closing};
+}
+function mcData(ym){
+  const tx=state[active].txlog||[];
+  if(tx.length){
+    const d=mcFromTxlog(ym);
+    const liveClose=state[active].portfolio.reduce((a,p)=>a+p.qty*p.cost,0);
+    if(Math.abs(d.closing-liveClose) < Math.max(2000, liveClose*0.02)) return d; // txlog in-sync -> 100% date-wise
+  }
+  // fallback (best-effort) — txlog khaali ho to
+  const rl=state[active].realized, pf=state[active].portfolio;
   const sells=ym==='all'?rl.slice():rl.filter(r=>String(r.date||'').slice(0,7)===ym);
   const realM=sells.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
   const sellVal=sells.reduce((a,r)=>a+r.sell*r.qty,0);
-  const t=totals(active); const cap=t.inv, tgt=0.05*cap;
-  return {sells,realM,sellVal,cap,tgt,inc:realM>0?0.05*realM:0,remain:Math.max(0,tgt-realM),
-          inv:state[active].portfolio.map(p=>({s:p.s,qty:p.qty,cost:p.cost,val:p.qty*p.cost})),
-          invTot:state[active].portfolio.reduce((a,p)=>a+p.qty*p.cost,0)};
+  const costSold=sells.reduce((a,r)=>a+r.cost*r.qty,0);
+  const closing=pf.reduce((a,p)=>a+p.qty*p.cost,0);
+  const buysM=ym==='all'?closing:pf.filter(p=>String(p.date||'').slice(0,7)===ym).reduce((a,p)=>a+p.qty*p.cost,0);
+  const opening=ym==='all'?0:Math.max(0, closing - buysM + costSold);
+  const cap=closing, tgt=0.05*cap;
+  return {sells,realM,sellVal,buysM,opening,closing,cap,tgt,inc:realM>0?0.05*realM:0,remain:Math.max(0,tgt-realM),
+          inv:pf.map(p=>({s:p.s,qty:p.qty,cost:p.cost,val:p.qty*p.cost})), invTot:closing};
 }
 function renderMcPrev(){
   const ym=$('mcMonth').value; if(!ym)return; const d=mcData(ym);
   const capPct=d.cap?d.realM/d.cap*100:0;
   $('mcPrev').innerHTML=`<div class="mc-box">
     <div class="mc-row"><span>Month</span><b>${ym==='all'?'All months':mcLabel(ym)}</b></div>
-    <div class="mc-row"><span>Sells booked</span><b>${d.sells.length}</b></div>
-    <div class="mc-row"><span>Total Sale Value</span><b>${money(d.sellVal)}</b></div>
-    <div class="mc-row"><span>Realized P&L (month)</span><b class="${cls(d.realM)}">${d.realM>=0?'+':''}${money(d.realM)}</b></div>
+    <div class="mc-row"><span>Opening inventory</span><b>${money(d.opening)}</b></div>
+    <div class="mc-row"><span>Buys (month)</span><b>${money(d.buysM)}</b></div>
     <div class="mc-row"><span>Capital (invested)</span><b>${money(d.cap)}</b></div>
+    <div class="mc-row"><span>Total Sale Value</span><b>${money(d.sellVal)}</b></div>
     <div class="mc-row"><span>5% Target</span><b>${money(d.tgt)}</b> <span style="color:var(--muted2)">(${capPct.toFixed(2)}% done)</span></div>
+    <div class="mc-row"><span>Realized P&L (month)</span><b class="${cls(d.realM)}">${d.realM>=0?'+':''}${money(d.realM)}</b></div>
     <div class="mc-row"><span>Target remaining</span><b style="color:var(--gold);font-weight:800">${money(d.remain)}</b></div>
     <div class="mc-row"><span>Incentive (5%)</span><b class="up">${money(d.inc)}</b></div>
-    <div class="mc-row"><span>Closing inventory</span><b>${d.inv.length} pos · ${money(d.invTot)}</b></div>
+    <div class="mc-row"><span>Closing inventory</span><b>${d.inv.length} pos · ${money(d.closing)}</b></div>
   </div>`;
 }
 
@@ -516,7 +628,7 @@ $('buySave').onclick=async()=>{
   const s=$('bSym').value.trim().toUpperCase(),q=+$('bQty').value,c=+$('bCost').value;
   if(!s||!(q>0)||!(c>0)){ alert('Symbol, Qty, Buy price zaroori.'); return; }
   const rec={s,qty:q,cost:c,cur:($('bCur').value!==''?+$('bCur').value:c),platform:$('bPlat').value.trim(),date:$('bDate').value||todayStr(),notes:$('bNotes').value.trim()};
-  if(editIdx>=0) state[active].portfolio[editIdx]=rec; else state[active].portfolio.push(rec);
+  if(editIdx>=0){ state[active].portfolio[editIdx]=rec; } else { state[active].portfolio.push(rec); await logTxn(active,rec.date,'BUY',rec.s,rec.qty,rec.qty*rec.cost); }
   await save(active,'portfolio'); $('buyModal').classList.remove('show'); renderAll();
 };
 
@@ -539,8 +651,10 @@ $('sellCancel').onclick=()=>$('sellModal').classList.remove('show');
 $('sellConfirm').onclick=async()=>{
   if(sellIdx<0)return; const p=state[active].portfolio[sellIdx]; const q=+$('sQty').value,sp=+$('sPrice').value;
   if(!(q>0)||!(sp>0)||q>p.qty){ alert('Qty/price theek daalein (qty holding se zyada nahi).'); return; }
-  state[active].realized.unshift({date:todayStr(),s:p.s,qty:q,cost:p.cost,sell:sp,pnl:(sp-p.cost)*q});
+  const sd=todayStr();
+  state[active].realized.unshift({date:sd,s:p.s,qty:q,cost:p.cost,sell:sp,pnl:(sp-p.cost)*q});
   if(q>=p.qty) state[active].portfolio.splice(sellIdx,1); else p.qty-=q;
+  await logTxn(active,sd,'SELL',p.s,q,q*sp);
   await save(active,'portfolio'); await save(active,'realized'); $('sellModal').classList.remove('show'); renderAll();
 };
 
@@ -565,6 +679,7 @@ $('rlzSave').onclick=async()=>{
   const rec={date:$('rDate').value||todayStr(),s,qty:q,cost:c,sell:sp,pnl:(sp-c)*q};
   if(rEdit>=0) state[active].realized[rEdit]=rec;
   else { state[active].realized.unshift(rec);
+    await logTxn(active,rec.date,'SELL',s,q,q*sp);
     const idx=state[active].portfolio.findIndex(p=>p.s===s);
     if(idx>=0 && state[active].portfolio[idx].qty>=q){ if(state[active].portfolio[idx].qty===q) state[active].portfolio.splice(idx,1); else state[active].portfolio[idx].qty-=q; await save(active,'portfolio'); }
   }
@@ -597,7 +712,7 @@ $('mcMonth').onchange=renderMcPrev;
 $('mcCsv').onclick=()=>{
   const ym=$('mcMonth').value,d=mcData(ym),esc=v=>`"${String(v).replace(/"/g,'""')}"`;
   const L=[[active+' Monthly Closure',ym==='all'?'All':mcLabel(ym)],[],
-    ['Realized P&L',Math.round(d.realM)],['Total Sale Value',Math.round(d.sellVal)],['Capital',Math.round(d.cap)],
+    ['Opening Inventory',Math.round(d.opening)],['Buys (month)',Math.round(d.buysM)],['Realized P&L',Math.round(d.realM)],['Total Sale Value',Math.round(d.sellVal)],['Capital',Math.round(d.cap)],
     ['5% Target',Math.round(d.tgt)],['Target remaining',Math.round(d.remain)],['Incentive (5%)',Math.round(d.inc)],[],
     ['SELLS'],['Date','Symbol','Qty','Buy','Sell','Realized']];
   d.sells.forEach(r=>L.push([r.date||'',r.s,r.qty,(+r.cost).toFixed(4),(+r.sell).toFixed(4),Math.round((r.sell-r.cost)*r.qty)]));
@@ -619,15 +734,20 @@ $('mcPdf').onclick=()=>{
     <h1>${P().name} — Monthly Closure — ${ym==='all'?'All Months':mcLabel(ym)}</h1>
     <div class="sub">INAMULLAH ABDULLAH · ${P().ccy} · Generated ${now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
     <div class="cards">
+      <div class="card"><div class="k">Opening Inventory</div><div class="v">${sym} ${Math.round(d.opening).toLocaleString()}</div></div>
+      <div class="card"><div class="k">Buys (month)</div><div class="v">${sym} ${Math.round(d.buysM).toLocaleString()}</div></div>
+      <div class="card"><div class="k">Capital (invested)</div><div class="v">${sym} ${Math.round(d.cap).toLocaleString()}</div></div>
       <div class="card"><div class="k">Total Sale Value</div><div class="v">${sym} ${Math.round(d.sellVal).toLocaleString()}</div></div>
-      <div class="card"><div class="k">Realized P&L</div><div class="v" style="color:${d.realM>=0?'#1a7f37':'#c1121f'}">${d.realM>=0?'+':''}${sym} ${Math.round(d.realM).toLocaleString()}</div></div>
+    </div>
+    <div class="cards">
       <div class="card"><div class="k">5% Target</div><div class="v">${sym} ${Math.round(d.tgt).toLocaleString()}</div></div>
+      <div class="card"><div class="k">Realized P&L (month)</div><div class="v" style="color:${d.realM>=0?'#1a7f37':'#c1121f'}">${d.realM>=0?'+':''}${sym} ${Math.round(d.realM).toLocaleString()}</div></div>
       <div class="card"><div class="k">Target remaining</div><div class="v" style="color:#c79a2e">${sym} ${Math.round(d.remain).toLocaleString()}</div></div>
       <div class="card"><div class="k">Incentive (5%)</div><div class="v" style="color:#1a7f37">${sym} ${Math.round(d.inc).toLocaleString()}</div></div>
     </div>
     <h3>Sells booked (${d.sells.length})</h3>
     <table><thead><tr><th>Date</th><th>Stock</th><th style="text-align:right">Qty</th><th style="text-align:right">Buy</th><th style="text-align:right">Sell</th><th style="text-align:right">Realized</th><th style="text-align:right">ROI%</th></tr></thead><tbody>${rows}</tbody></table>
-    <h3>Closing Inventory — carry-forward (${d.inv.length} pos · ${sym} ${Math.round(d.invTot).toLocaleString()})</h3>
+    <h3>Closing Inventory — carry-forward (${d.inv.length} pos · ${sym} ${Math.round(d.closing).toLocaleString()})</h3>
     <table><thead><tr><th>Stock</th><th style="text-align:right">Qty</th><th style="text-align:right">Avg Cost</th><th style="text-align:right">Cost Value</th></tr></thead><tbody>${inv}</tbody></table>
     <div class="foot">Realized = booked profit · Incentive = 5% of realized · Closing inventory carry-forward. Informational only, not investment advice.</div>
   </body></html>`);
@@ -715,6 +835,14 @@ function generateSummaryPDF(ym){
   w.document.close(); w.focus(); setTimeout(()=>{try{w.print();}catch(e){}},500);
 }
 $('sumPdf2').onclick=()=>generateSummaryPDF($('sumMonth').value||nowYM());
+
+
+/* ---------- transaction log (date-wise) ---------- */
+async function logTxn(id,date,act,sym,qty,amt){
+  if(!state[id].txlog) state[id].txlog=[];
+  state[id].txlog.push([date,act,sym,+qty,+amt]);
+  await save(id,'txlog');
+}
 
 /* ---------- boot ---------- */
 renderTabs(); renderOverview(); renderAll(); subscribe();
