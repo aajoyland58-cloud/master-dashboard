@@ -626,7 +626,7 @@ function mcData(ym){
   const opening=ym==='all'?0:Math.max(0, closing - buysM + costSold);
   const cap=closing, tgt=0.05*cap;
   return {sells,realM,sellVal,buysM,opening,closing,cap,tgt,inc:realM>0?0.05*realM:0,remain:Math.max(0,tgt-realM),
-          inv:pf.map(p=>({s:p.s,qty:p.qty,cost:p.cost,val:p.qty*p.cost})), invTot:closing};
+          inv:pf.map(p=>({s:p.s,qty:p.qty,cost:p.cost,val:p.qty*p.cost,platform:p.platform||''})), invTot:closing};
 }
 function renderMcPrev(){
   const ym=$('mcMonth').value; if(!ym)return; const d=mcData(ym);
@@ -755,8 +755,8 @@ $('mcCsv').onclick=()=>{
 $('mcPdf').onclick=()=>{
   const ym=$('mcMonth').value,d=mcData(ym),sym=P().sym,now=new Date();
   const rows=d.sells.map(r=>{const pl=(r.sell-r.cost)*r.qty,inv=r.cost*r.qty,roi=inv?pl/inv*100:0;
-    return `<tr><td>${r.date||''}</td><td>${r.s}</td><td style="text-align:right">${(+r.qty).toLocaleString()}</td><td style="text-align:right">${fmt(r.cost)}</td><td style="text-align:right">${fmt(r.sell)}</td><td style="text-align:right;color:${pl>=0?'#1a7f37':'#c1121f'}">${pl>=0?'+':''}${sym} ${Math.round(pl).toLocaleString()}</td><td style="text-align:right">${roi>=0?'+':''}${roi.toFixed(1)}%</td></tr>`;}).join('')||'<tr><td colspan="7" style="text-align:center;color:#888">Koi sell nahi</td></tr>';
-  const inv=d.inv.map(x=>`<tr><td>${x.s}</td><td style="text-align:right">${(+x.qty).toLocaleString()}</td><td style="text-align:right">${fmt(x.cost)}</td><td style="text-align:right">${sym} ${Math.round(x.val).toLocaleString()}</td></tr>`).join('');
+    return `<tr><td>${r.date||''}</td><td>${r.s}</td><td>${r.platform||'—'}</td><td style="text-align:right">${(+r.qty).toLocaleString()}</td><td style="text-align:right">${fmt(r.cost)}</td><td style="text-align:right">${fmt(r.sell)}</td><td style="text-align:right;color:${pl>=0?'#1a7f37':'#c1121f'}">${pl>=0?'+':''}${sym} ${Math.round(pl).toLocaleString()}</td><td style="text-align:right">${roi>=0?'+':''}${roi.toFixed(1)}%</td></tr>`;}).join('')||'<tr><td colspan="8" style="text-align:center;color:#888">Koi sell nahi</td></tr>';
+  const inv=d.inv.map(x=>`<tr><td>${x.s}</td><td>${x.platform||'—'}</td><td style="text-align:right">${(+x.qty).toLocaleString()}</td><td style="text-align:right">${fmt(x.cost)}</td><td style="text-align:right">${sym} ${Math.round(x.val).toLocaleString()}</td></tr>`).join('');
   const w=window.open('','_blank'); if(!w){alert('Popup allow karein');return;}
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${active} Closure ${ym}</title><style>
     body{font-family:'Segoe UI',Arial;color:#1a1a1a;padding:30px 38px;font-size:13px}h1{color:#1a3d6d;font-size:19px;margin:0}
@@ -779,9 +779,9 @@ $('mcPdf').onclick=()=>{
       <div class="card"><div class="k">Incentive (5%)</div><div class="v" style="color:#1a7f37">${sym} ${Math.round(d.inc).toLocaleString()}</div></div>
     </div>
     <h3>Sells booked (${d.sells.length})</h3>
-    <table><thead><tr><th>Date</th><th>Stock</th><th style="text-align:right">Qty</th><th style="text-align:right">Buy</th><th style="text-align:right">Sell</th><th style="text-align:right">Realized</th><th style="text-align:right">ROI%</th></tr></thead><tbody>${rows}</tbody></table>
+    <table><thead><tr><th>Date</th><th>Stock</th><th>Platform</th><th style="text-align:right">Qty</th><th style="text-align:right">Buy</th><th style="text-align:right">Sell</th><th style="text-align:right">Realized</th><th style="text-align:right">ROI%</th></tr></thead><tbody>${rows}</tbody></table>
     <h3>Closing Inventory — carry-forward (${d.inv.length} pos · ${sym} ${Math.round(d.closing).toLocaleString()})</h3>
-    <table><thead><tr><th>Stock</th><th style="text-align:right">Qty</th><th style="text-align:right">Avg Cost</th><th style="text-align:right">Cost Value</th></tr></thead><tbody>${inv}</tbody></table>
+    <table><thead><tr><th>Stock</th><th>Platform</th><th style="text-align:right">Qty</th><th style="text-align:right">Avg Cost</th><th style="text-align:right">Cost Value</th></tr></thead><tbody>${inv}</tbody></table>
     <div class="foot">Realized = booked profit · Incentive = 5% of realized · Closing inventory carry-forward. Informational only, not investment advice.</div>
   </body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>{try{w.print();}catch(e){}},500);
@@ -805,7 +805,7 @@ function sumRows(ym){
     const sells=ym==='all'?rl:rl.filter(r=>String(r.date||'').slice(0,7)===ym);
     const realM=sells.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
     const tgt=0.05*inv;
-    return {p,inv,cur,unpl:cur-inv,realM,tgt,inc:realM>0?0.05*realM:0,remain:Math.max(0,tgt-realM),pos:pf.length};
+    return {p,inv,cur,unpl:cur-inv,roi:inv?((cur-inv)/inv*100):0,realM,tgt,inc:realM>0?0.05*realM:0,remain:Math.max(0,tgt-realM),pos:pf.length};
   });
 }
 function renderSummary(){
@@ -820,6 +820,7 @@ function renderSummary(){
       <td class="l">${r.p.ccy}</td>
       <td>${money0(sym,r.inv)}</td><td>${money0(sym,r.cur)}</td>
       <td class="${cls(r.unpl)}">${r.unpl>=0?'+':''}${money0(sym,r.unpl)}</td>
+      <td class="${cls(r.roi)}">${r.roi>=0?'+':''}${r.roi.toFixed(1)}%</td>
       <td class="${cls(r.realM)}">${r.realM>=0?'+':''}${money0(sym,r.realM)}</td>
       <td>${money0(sym,r.tgt)}</td>
       <td style="color:var(--gold)">${money0(sym,r.remain)}</td>
@@ -828,12 +829,14 @@ function renderSummary(){
   }).join('');
   // currency subtotals
   const byC={}; rows.forEach(r=>{const c=r.p.ccy; byC[c]=byC[c]||{sym:r.p.sym,inv:0,cur:0,real:0}; byC[c].inv+=r.inv;byC[c].cur+=r.cur;byC[c].real+=r.realM;});
-  const subs=Object.entries(byC).map(([c,v])=>`<tr style="background:#1b2735;font-weight:700">
+  const subs=Object.entries(byC).map(([c,v])=>{const roi=v.inv?((v.cur-v.inv)/v.inv*100):0;
+    return `<tr style="background:#1b2735;font-weight:700">
     <td class="l">TOTAL</td><td class="l">${c}</td><td>${v.sym} ${Math.round(v.inv).toLocaleString()}</td><td>${v.sym} ${Math.round(v.cur).toLocaleString()}</td>
     <td class="${cls(v.cur-v.inv)}">${(v.cur-v.inv)>=0?'+':''}${v.sym} ${Math.round(v.cur-v.inv).toLocaleString()}</td>
-    <td class="${cls(v.real)}">${v.real>=0?'+':''}${v.sym} ${Math.round(v.real).toLocaleString()}</td><td colspan="4"></td></tr>`).join('');
-  $('sumTable').innerHTML=`<table style="min-width:820px"><thead><tr>
-    <th class="l">Platform</th><th class="l">Ccy</th><th>Invested</th><th>Current</th><th>Unrealized</th><th>Realized (mo)</th><th>5% Target</th><th>Remaining</th><th>Incentive</th><th>Pos</th>
+    <td class="${cls(roi)}">${roi>=0?'+':''}${roi.toFixed(1)}%</td>
+    <td class="${cls(v.real)}">${v.real>=0?'+':''}${v.sym} ${Math.round(v.real).toLocaleString()}</td><td colspan="4"></td></tr>`;}).join('');
+  $('sumTable').innerHTML=`<table style="min-width:880px"><thead><tr>
+    <th class="l">Platform</th><th class="l">Ccy</th><th>Invested</th><th>Current</th><th>Unrealized</th><th>ROI %</th><th>Realized (mo)</th><th>5% Target</th><th>Remaining</th><th>Incentive</th><th>Pos</th>
     </tr></thead><tbody>${body}${subs}</tbody></table>`;
 }
 $('sumMonth').onchange=renderSummary;
@@ -845,14 +848,17 @@ function generateSummaryPDF(ym){
     <td style="font-weight:700"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${r.p.color};margin-right:6px"></span>${r.p.name}</td>
     <td>${r.p.ccy}</td><td style="text-align:right">${f(r.p.sym,r.inv)}</td><td style="text-align:right">${f(r.p.sym,r.cur)}</td>
     <td style="text-align:right;color:${g(r.unpl)}">${r.unpl>=0?'+':''}${f(r.p.sym,r.unpl)}</td>
+    <td style="text-align:right;color:${g(r.roi)}">${r.roi>=0?'+':''}${r.roi.toFixed(1)}%</td>
     <td style="text-align:right;color:${g(r.realM)}">${r.realM>=0?'+':''}${f(r.p.sym,r.realM)}</td>
     <td style="text-align:right">${f(r.p.sym,r.tgt)}</td><td style="text-align:right;color:#c79a2e">${f(r.p.sym,r.remain)}</td>
     <td style="text-align:right;color:#1a7f37">${f(r.p.sym,r.inc)}</td><td style="text-align:right">${r.pos}</td></tr>`).join('');
   const byC={}; rows.forEach(r=>{const c=r.p.ccy;byC[c]=byC[c]||{sym:r.p.sym,inv:0,cur:0,real:0};byC[c].inv+=r.inv;byC[c].cur+=r.cur;byC[c].real+=r.realM;});
-  const subs=Object.entries(byC).map(([c,v])=>`<tr style="background:#eef2f7;font-weight:700"><td>TOTAL (${c})</td><td>${c}</td>
+  const subs=Object.entries(byC).map(([c,v])=>{const roi=v.inv?((v.cur-v.inv)/v.inv*100):0;
+    return `<tr style="background:#eef2f7;font-weight:700"><td>TOTAL (${c})</td><td>${c}</td>
     <td style="text-align:right">${v.sym} ${Math.round(v.inv).toLocaleString()}</td><td style="text-align:right">${v.sym} ${Math.round(v.cur).toLocaleString()}</td>
     <td style="text-align:right;color:${g(v.cur-v.inv)}">${(v.cur-v.inv)>=0?'+':''}${v.sym} ${Math.round(v.cur-v.inv).toLocaleString()}</td>
-    <td style="text-align:right;color:${g(v.real)}">${v.real>=0?'+':''}${v.sym} ${Math.round(v.real).toLocaleString()}</td><td colspan="4"></td></tr>`).join('');
+    <td style="text-align:right;color:${g(roi)}">${roi>=0?'+':''}${roi.toFixed(1)}%</td>
+    <td style="text-align:right;color:${g(v.real)}">${v.real>=0?'+':''}${v.sym} ${Math.round(v.real).toLocaleString()}</td><td colspan="4"></td></tr>`;}).join('');
   const w=window.open('','_blank'); if(!w){alert('Popup allow karein');return;}
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>All-Platforms Summary ${ym}</title><style>
     body{font-family:'Segoe UI',Arial;color:#1a1a1a;padding:26px 32px;font-size:12.5px}h1{color:#1a3d6d;font-size:20px;margin:0}
@@ -861,7 +867,7 @@ function generateSummaryPDF(ym){
     .foot{color:#999;font-size:10px;margin-top:18px;border-top:1px solid #e2e2e2;padding-top:7px}</style></head><body>
     <h1>Master Portfolio — All-Platforms Summary</h1>
     <div class="sub">INAMULLAH ABDULLAH · Month: <b>${mLabel(ym)}</b> · Generated ${now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
-    <table><thead><tr><th>Platform</th><th>Ccy</th><th style="text-align:right">Invested</th><th style="text-align:right">Current</th><th style="text-align:right">Unrealized</th><th style="text-align:right">Realized (mo)</th><th style="text-align:right">5% Target</th><th style="text-align:right">Remaining</th><th style="text-align:right">Incentive</th><th style="text-align:right">Pos</th></tr></thead>
+    <table><thead><tr><th>Platform</th><th>Ccy</th><th style="text-align:right">Invested</th><th style="text-align:right">Current</th><th style="text-align:right">Unrealized</th><th style="text-align:right">ROI %</th><th style="text-align:right">Realized (mo)</th><th style="text-align:right">5% Target</th><th style="text-align:right">Remaining</th><th style="text-align:right">Incentive</th><th style="text-align:right">Pos</th></tr></thead>
     <tbody>${body}${subs}</tbody></table>
     <div class="foot">Har platform apni currency mein. Realized = booked profit · Incentive = 5% of realized · Target = 5% of invested. Informational only, not investment advice.</div>
   </body></html>`);
