@@ -169,6 +169,7 @@
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span id="rlzTot" style="font-size:13px;font-weight:700"></span>
         <button class="btn sm" id="dlSaleBtn">⬇ Sale Journal</button>
+        <button class="btn sm primary owner-only" id="impSellBtn">⬆ Import Sells</button>
         <button class="btn sm primary owner-only" id="addSellBtn">＋ Add Sell</button>
       </div>
     </div>
@@ -252,6 +253,14 @@
   </div>
   <div class="prev" id="rlzPrev"></div>
   <div class="modal-btns"><button class="btn ghost" id="rlzCancel">Cancel</button><button class="btn primary" id="rlzSave">✓ Save</button></div>
+</div></div>
+
+<div class="modal-ov" id="impModal"><div class="modal" style="width:560px">
+  <h3>⬆ Import Sells (bulk)</h3>
+  <p style="font-size:12px;color:var(--muted)">Har line: <b>Date, Ticker, Qty, BuyCost, SellPrice</b><br>Misal: <span style="font-family:var(--mono)">2026-09-01, GPRO, 250, 0.82, 1.496</span></p>
+  <textarea id="impText" style="width:100%;height:200px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;color:var(--text);padding:10px;font-family:var(--mono);font-size:12px"></textarea>
+  <div class="prev" id="impPrev"></div>
+  <div class="modal-btns"><button class="btn ghost" id="impCancel">Cancel</button><button class="btn primary" id="impApply">Import</button></div>
 </div></div>
 
 <div class="modal-ov" id="bulkModal"><div class="modal">
@@ -687,8 +696,7 @@ $('rlzSave').onclick=async()=>{
 };
 
 /* ---------- bulk price ---------- */
-$('bulkBtn').onclick=()=>{ if(!canEdit)return; $('bulkText').value=''; $('bulkModal').classList.add('show'); };
-$('bulkCancel').onclick=()=>$('bulkModal').classList.remove('show');
+$('bulkBtn').onclick=()=>{ if(!canEdit)return; $('bulkText').value=''; $('bulkModal').classList.add('show'); };$('bulkCancel').onclick=()=>$('bulkModal').classList.remove('show');
 $('bulkApply').onclick=async()=>{
   const lines=$('bulkText').value.split('\n'); let n=0;
   lines.forEach(ln=>{ const m=ln.trim().replace(',',' ').split(/\s+/); if(m.length>=2){ const sym=m[0].toUpperCase(),pr=+m[1];
@@ -842,6 +850,32 @@ async function logTxn(id,date,act,sym,qty,amt){
   if(!state[id].txlog) state[id].txlog=[];
   state[id].txlog.push([date,act,sym,+qty,+amt]);
   await save(id,'txlog');
+}
+
+/* ---------- Import Sells (bulk) ---------- */
+function parseImpSells(text){
+  const out=[];
+  text.split('\n').forEach(ln=>{
+    ln=ln.trim(); if(!ln||/^date/i.test(ln))return;
+    const c=ln.split(/[\t,]/).map(x=>x.replace(/\$/g,'').replace(/,/g,'').trim());
+    if(c.length<5)return;
+    const date=c[0], s=(c[1]||'').toUpperCase(), qty=+c[2], cost=+c[3], sell=+c[4];
+    if(s && qty>0 && cost>=0 && sell>=0) out.push({date,s,qty,cost,sell,pnl:(sell-cost)*qty});
+  });
+  return out;
+}
+if($('impSellBtn')){
+  $('impSellBtn').onclick=()=>{ if(!canEdit)return; $('impText').value=''; $('impPrev').textContent=''; $('impModal').classList.add('show'); };
+  $('impText').addEventListener('input',()=>{ const r=parseImpSells($('impText').value); const tot=r.reduce((a,x)=>a+x.pnl,0); $('impPrev').innerHTML=r.length?`${r.length} sells · Realized: <b class="${cls(tot)}">${tot>=0?'+':''}${money(tot)}</b>`:'Rows paste karein…'; });
+  $('impCancel').onclick=()=>$('impModal').classList.remove('show');
+  $('impApply').onclick=async()=>{
+    const r=parseImpSells($('impText').value);
+    if(!r.length){ alert('Koi valid row nahi mili.'); return; }
+    if(!confirm(`${r.length} sells import karein? Realized ${money(r.reduce((a,x)=>a+x.pnl,0))}`)) return;
+    r.forEach(x=>state[active].realized.unshift(x));
+    await save(active,'realized'); $('impModal').classList.remove('show'); renderAll();
+    alert(r.length+' sells import ho gayin.');
+  };
 }
 
 /* ---------- boot ---------- */
