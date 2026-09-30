@@ -579,7 +579,7 @@ function mcData(ym){
   if(tx.length){
     const d=mcFromTxlog(ym);
     const liveClose=state[active].portfolio.reduce((a,p)=>a+p.qty*p.cost,0);
-    if(Math.abs(d.closing-liveClose) < Math.max(2000, liveClose*0.02)) return d; // txlog in-sync -> 100% date-wise
+    if(Math.abs(d.closing-liveClose) < Math.max(2000, liveClose*0.02)){ d.exact=true; return d; } // 100% date-wise
   }
   // fallback (best-effort) — txlog khaali ho to
   const rl=state[active].realized, pf=state[active].portfolio;
@@ -599,8 +599,8 @@ function renderMcPrev(){
   const capPct=d.cap?d.realM/d.cap*100:0;
   $('mcPrev').innerHTML=`<div class="mc-box">
     <div class="mc-row"><span>Month</span><b>${ym==='all'?'All months':mcLabel(ym)}</b></div>
-    <div class="mc-row"><span>Opening inventory</span><b>${money(d.opening)}</b></div>
-    <div class="mc-row"><span>Buys (month)</span><b>${money(d.buysM)}</b></div>
+    ${d.exact?`<div class="mc-row"><span>Opening inventory</span><b>${money(d.opening)}</b></div>
+    <div class="mc-row"><span>Buys (month)</span><b>${money(d.buysM)}</b></div>`:''}
     <div class="mc-row"><span>Capital (invested)</span><b>${money(d.cap)}</b></div>
     <div class="mc-row"><span>Total Sale Value</span><b>${money(d.sellVal)}</b></div>
     <div class="mc-row"><span>5% Target</span><b>${money(d.tgt)}</b> <span style="color:var(--muted2)">(${capPct.toFixed(2)}% done)</span></div>
@@ -608,7 +608,7 @@ function renderMcPrev(){
     <div class="mc-row"><span>Target remaining</span><b style="color:var(--gold);font-weight:800">${money(d.remain)}</b></div>
     <div class="mc-row"><span>Incentive (5%)</span><b class="up">${money(d.inc)}</b></div>
     <div class="mc-row"><span>Closing inventory</span><b>${d.inv.length} pos · ${money(d.closing)}</b></div>
-  </div>`;
+  </div>${d.exact?'':'<p class="p-note">Opening / Buys sirf tab dikhte hain jab poora data Master ke through aaye (100% date-wise). Baaki sab exact hai.</p>'}`;
 }
 
 /* ---------- edit lock ---------- */
@@ -734,8 +734,8 @@ $('mcPdf').onclick=()=>{
     <h1>${P().name} — Monthly Closure — ${ym==='all'?'All Months':mcLabel(ym)}</h1>
     <div class="sub">INAMULLAH ABDULLAH · ${P().ccy} · Generated ${now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
     <div class="cards">
-      <div class="card"><div class="k">Opening Inventory</div><div class="v">${sym} ${Math.round(d.opening).toLocaleString()}</div></div>
-      <div class="card"><div class="k">Buys (month)</div><div class="v">${sym} ${Math.round(d.buysM).toLocaleString()}</div></div>
+      ${d.exact?`<div class="card"><div class="k">Opening Inventory</div><div class="v">${sym} ${Math.round(d.opening).toLocaleString()}</div></div>
+      <div class="card"><div class="k">Buys (month)</div><div class="v">${sym} ${Math.round(d.buysM).toLocaleString()}</div></div>`:''}
       <div class="card"><div class="k">Capital (invested)</div><div class="v">${sym} ${Math.round(d.cap).toLocaleString()}</div></div>
       <div class="card"><div class="k">Total Sale Value</div><div class="v">${sym} ${Math.round(d.sellVal).toLocaleString()}</div></div>
     </div>
