@@ -143,6 +143,7 @@
       <div class="p-title"><span class="bar"></span>Portfolio &amp; P&amp;L <span id="pfCcy" style="color:var(--muted2);font-weight:500;font-size:12px"></span></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn sm primary owner-only" id="addBuyBtn">＋ Add Buy</button>
+        <button class="btn sm primary owner-only" id="impBuyBtn">⬆ Import Buys</button>
         <button class="btn sm primary owner-only" id="bulkBtn">⇊ Update prices</button>
       </div>
     </div>
@@ -253,6 +254,14 @@
   </div>
   <div class="prev" id="rlzPrev"></div>
   <div class="modal-btns"><button class="btn ghost" id="rlzCancel">Cancel</button><button class="btn primary" id="rlzSave">✓ Save</button></div>
+</div></div>
+
+<div class="modal-ov" id="impBuyModal"><div class="modal" style="width:560px">
+  <h3>⬆ Import Buys (bulk)</h3>
+  <p style="font-size:12px;color:var(--muted)">Har line: <b>Date, Ticker, Qty, BuyCost, CurrentPrice</b> (current optional)<br>Misal: <span style="font-family:var(--mono)">2026-07-10, GFS, 15, 69.29, 72.00</span></p>
+  <textarea id="impBuyText" style="width:100%;height:200px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;color:var(--text);padding:10px;font-family:var(--mono);font-size:12px"></textarea>
+  <div class="prev" id="impBuyPrev"></div>
+  <div class="modal-btns"><button class="btn ghost" id="impBuyCancel">Cancel</button><button class="btn primary" id="impBuyApply">Import</button></div>
 </div></div>
 
 <div class="modal-ov" id="impModal"><div class="modal" style="width:560px">
@@ -851,6 +860,33 @@ async function logTxn(id,date,act,sym,qty,amt){
   if(!state[id].txlog) state[id].txlog=[];
   state[id].txlog.push([date,act,sym,+qty,+amt]);
   await save(id,'txlog');
+}
+
+/* ---------- Import Buys (bulk) ---------- */
+function parseImpBuys(text){
+  const out=[];
+  text.split('\n').forEach(ln=>{
+    ln=ln.trim(); if(!ln||/^date/i.test(ln))return;
+    const c=ln.split(/[\t,]/).map(x=>x.replace(/\$/g,'').replace(/,/g,'').trim());
+    if(c.length<4)return;
+    const date=c[0], s=(c[1]||'').toUpperCase(), qty=+c[2], cost=+c[3];
+    const cur=(c.length>=5 && c[4]!=='')?+c[4]:cost;
+    if(s && qty>0 && cost>0) out.push({s,qty,cost,cur,platform:'',date,notes:''});
+  });
+  return out;
+}
+if($('impBuyBtn')){
+  $('impBuyBtn').onclick=()=>{ if(!canEdit)return; $('impBuyText').value=''; $('impBuyPrev').textContent=''; $('impBuyModal').classList.add('show'); };
+  $('impBuyText').addEventListener('input',()=>{ const r=parseImpBuys($('impBuyText').value); const inv=r.reduce((a,x)=>a+x.qty*x.cost,0); $('impBuyPrev').innerHTML=r.length?`${r.length} buys · Invested: <b>${money(inv)}</b>`:'Rows paste karein…'; });
+  $('impBuyCancel').onclick=()=>$('impBuyModal').classList.remove('show');
+  $('impBuyApply').onclick=async()=>{
+    const r=parseImpBuys($('impBuyText').value);
+    if(!r.length){ alert('Koi valid row nahi.'); return; }
+    if(!confirm(`${r.length} buys import karein? Invested ${money(r.reduce((a,x)=>a+x.qty*x.cost,0))}`)) return;
+    r.forEach(x=>state[active].portfolio.push(x));
+    await save(active,'portfolio'); $('impBuyModal').classList.remove('show'); renderAll();
+    alert(r.length+' buys import ho gayin.');
+  };
 }
 
 /* ---------- Import Sells (bulk) ---------- */
