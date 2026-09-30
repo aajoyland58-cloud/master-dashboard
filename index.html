@@ -349,7 +349,11 @@ function renderOverview(){
 
 /* ---------- tabs ---------- */
 function renderTabs(){
-  let html=PLATFORMS.map(p=>{
+  const sOn=active==='SUMMARY';
+  let html=`<div class="tab ${sOn?'act':''}" data-tab="SUMMARY" style="${sOn?'border-color:var(--gold);background:#e6b84a22;':''}">
+    <span class="tdot" style="background:var(--gold)"></span>
+    <span class="tname">📊 Summary<small>All platforms</small></span></div>`;
+  html+=PLATFORMS.map(p=>{
     const on=p.id===active;
     const style=on?`border-color:${p.color};background:${p.color}22;`:'';
     return `<div class="tab ${on?'act':''}" data-tab="${p.id}" style="${style}">
@@ -357,18 +361,15 @@ function renderTabs(){
       <span class="tname">${p.name}<small>${p.sub}</small></span>
     </div>`;
   }).join('');
-  const sOn=active==='SUMMARY';
-  html+=`<div class="tab ${sOn?'act':''}" data-tab="SUMMARY" style="${sOn?'border-color:var(--gold);background:#e6b84a22;':''}">
-    <span class="tdot" style="background:var(--gold)"></span>
-    <span class="tname">📊 Summary<small>All platforms</small></span></div>`;
   $('tabBar').innerHTML=html;
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>setTab(t.dataset.tab));
 }
 function setTab(id){
-  active=id; renderTabs(); renderOverview();
+  active=id; brokerFilter=null; renderTabs(); renderOverview();
   if(id==='SUMMARY'){ $('platformView').classList.add('hide'); $('summaryView').classList.remove('hide'); renderSummary(); }
   else { $('summaryView').classList.add('hide'); $('platformView').classList.remove('hide'); renderAll(); }
 }
+let brokerFilter=null;
 
 /* ---------- render active platform ---------- */
 function renderAll(){ renderPortfolio(); renderRealized(); renderInc(); renderMcMonths(); updateCcyLabels(); }
@@ -386,15 +387,20 @@ function renderPortfolio(){
   const gk=Object.keys(groups);
   if(gk.length>1){
     $('brokerSum').style.display='';
-    $('brokerSum').innerHTML=gk.map(g=>{const v=groups[g],pl=v.cur-v.inv,plp=v.inv?pl/v.inv*100:0;
-      return `<div class="stat"><div class="k">${g} · ${v.n} pos</div>
+    const allOn=!brokerFilter;
+    let cards=`<div class="stat" data-broker="__all" style="cursor:pointer;${allOn?'border-color:var(--accent)':''}"><div class="k">All brokers · ${pf.length} pos</div><div class="v" style="font-size:15px">${money(t.cur)}</div><div style="font-size:12px;font-family:var(--mono)" class="${cls(t.pl)}">${t.pl>=0?'+':''}${money(t.pl)}</div></div>`;
+    cards+=gk.map(g=>{const v=groups[g],pl=v.cur-v.inv,plp=v.inv?pl/v.inv*100:0;const on=brokerFilter===g;
+      return `<div class="stat" data-broker="${g}" style="cursor:pointer;${on?'border-color:var(--accent)':''}"><div class="k">${g} · ${v.n} pos</div>
         <div class="v" style="font-size:15px">${money(v.cur)}</div>
         <div style="font-size:12px;font-family:var(--mono)" class="${cls(pl)}">${pl>=0?'+':''}${money(pl)} (${plp>=0?'+':''}${plp.toFixed(1)}%)</div></div>`;
     }).join('');
+    $('brokerSum').innerHTML=cards;
+    $('brokerSum').querySelectorAll('[data-broker]').forEach(el=>el.onclick=()=>{ const b=el.dataset.broker; brokerFilter=(b==='__all')?null:b; renderPortfolio(); });
   } else { $('brokerSum').style.display='none'; $('brokerSum').innerHTML=''; }
   if(!pf.length){ $('pfTable').style.display='none'; $('pfEmpty').style.display='block'; return; }
   $('pfTable').style.display=''; $('pfEmpty').style.display='none';
   $('pfBody').innerHTML=pf.map((p,i)=>{
+    if(brokerFilter && (p.platform||'—')!==brokerFilter) return '';
     const c=curOf(p), inv=p.qty*p.cost, val=p.qty*c, pl=val-inv, plp=inv?pl/inv*100:0;
     return `<tr>
       <td class="l sym"><b>${p.s}</b>${p.notes?`<span>${p.notes}</span>`:''}</td>
