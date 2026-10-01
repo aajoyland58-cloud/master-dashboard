@@ -462,10 +462,15 @@ function totals(id){
 function renderOverview(){
   $('ovStrip').innerHTML=PLATFORMS.map(p=>{
     const t=totals(p.id); const sym=p.sym; const on=p.id===active;
+    const cap=state[p.id].capital||0;
+    const hasHold = t.cur>0.0001;
+    const mainTxt = hasHold ? `${sym} ${Math.round(t.cur).toLocaleString('en-US')}` : (cap>0 ? `${sym} ${Math.round(cap).toLocaleString('en-US')}` : `${sym} 0`);
+    const subTxt = hasHold ? `${t.pl>=0?'+':''}${sym} ${Math.round(t.pl).toLocaleString('en-US')}` : (cap>0 ? 'capital (cash)' : '—');
+    const subCls = hasHold ? cls(t.pl) : '';
     return `<div class="ovcard ${on?'act':''}" data-tab="${p.id}" style="${on?`border-color:${p.color}`:''}">
       <div class="k"><span class="dot" style="background:${p.color}"></span>${p.name}</div>
-      <div class="v">${sym} ${Math.round(t.cur).toLocaleString('en-US')}</div>
-      <div class="pl ${cls(t.pl)}">${t.pl>=0?'+':''}${sym} ${Math.round(t.pl).toLocaleString('en-US')}</div>
+      <div class="v">${mainTxt}</div>
+      <div class="pl ${subCls}">${subTxt}</div>
     </div>`;
   }).join('');
   document.querySelectorAll('.ovcard').forEach(c=>c.onclick=()=>setTab(c.dataset.tab));
