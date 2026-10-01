@@ -772,7 +772,7 @@ $('mcPdf').onclick=()=>{
     table{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:12px}th,td{border:1px solid #dcdcdc;padding:6px 8px;text-align:left}th{background:#eef2f7}
     h3{color:#1a3d6d;font-size:14px;margin:14px 0 5px}.foot{color:#999;font-size:10px;margin-top:20px;border-top:1px solid #e2e2e2;padding-top:7px}</style></head><body>
     <h1>${P().name} — Monthly Closure — ${ym==='all'?'All Months':mcLabel(ym)}</h1>
-    <div class="sub">INAMULLAH ABDULLAH · ${P().ccy} · Generated ${now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+    <div class="sub">${P().ccy} · Generated ${now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
     <div class="cards">
       ${d.exact?`<div class="card"><div class="k">Opening Inventory</div><div class="v">${sym} ${Math.round(d.opening).toLocaleString()}</div></div>
       <div class="card"><div class="k">Buys (month)</div><div class="v">${sym} ${Math.round(d.buysM).toLocaleString()}</div></div>`:''}
@@ -873,10 +873,10 @@ function generateSummaryPDF(ym){
     th,td{border:1px solid #dcdcdc;padding:6px 7px;text-align:left}th{background:#1a3d6d;color:#fff;font-size:10.5px}
     .foot{color:#999;font-size:10px;margin-top:18px;border-top:1px solid #e2e2e2;padding-top:7px}</style></head><body>
     <h1>Master Portfolio — All-Platforms Summary</h1>
-    <div class="sub">INAMULLAH ABDULLAH · Month: <b>${mLabel(ym)}</b> · Generated ${now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+    <div class="sub">Month: <b>${mLabel(ym)}</b> · Generated ${now.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
     <table><thead><tr><th>Platform</th><th>Ccy</th><th style="text-align:right">Invested</th><th style="text-align:right">Current</th><th style="text-align:right">Unrealized</th><th style="text-align:right">ROI %</th><th style="text-align:right">Realized (mo)</th><th style="text-align:right">5% Target</th><th style="text-align:right">Remaining</th><th style="text-align:right">Incentive</th><th style="text-align:right">Pos</th></tr></thead>
     <tbody>${body}${subs}</tbody></table>
-    <div class="foot">Har platform apni currency mein. Realized = booked profit · Incentive = 5% of realized · Target = 5% of invested. Informational only, not investment advice.</div>
+    <div class="foot">Har platform apni currency mein. Realized = booked profit · Incentive = 5% of realized · Target = 5% of allocated capital (boss) — ya invested agar capital set nahi. Informational only, not investment advice.</div>
   </body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>{try{w.print();}catch(e){}},500);
 }
@@ -981,10 +981,14 @@ async function autoPrices(){
     try{
       let price=null;
       if(active==='PSX'){
-        // PSX Terminal free API
-        const r=await fetch('https://psxterminal.com/api/ticks/REG/'+encodeURIComponent(p.s));
-        if(r.ok){ const j=await r.json(); const d=j.data||j;
-          const px=d.price??d.last??d.c??d.close??d.ltp; if(+px>0) price=+px; }
+        // PSX Terminal free API (CORS-proxy fallback ke saath)
+        const urls=['https://psxterminal.com/api/ticks/REG/'+encodeURIComponent(p.s),
+                    'https://corsproxy.io/?url='+encodeURIComponent('https://psxterminal.com/api/ticks/REG/'+p.s),
+                    'https://api.allorigins.win/raw?url='+encodeURIComponent('https://psxterminal.com/api/ticks/REG/'+p.s)];
+        for(const u of urls){
+          try{ const r=await fetch(u); if(r.ok){ const j=await r.json(); const d=j.data||j;
+            const px=d.price??d.last??d.c??d.close??d.ltp; if(+px>0){ price=+px; break; } } }catch(e){}
+        }
       } else if(isCrypto){
         const sym=p.s.replace(/USDT$/,'')+'USDT';
         const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+sym);
