@@ -422,6 +422,8 @@ function subscribe(){
     });
     db.ref(key(p.id,'capital')).on('value',snap=>{ state[p.id].capital=+snap.val()||0; if(p.id===active){renderInc();renderMcMonths();} renderOverview(); });
   });
+  // PSX robot prices (k_psx_overrides) — PSX tab auto-price
+  db.ref('psxShared/k_psx_overrides').on('value',snap=>{ psxOverrides=snap.val()||{}; if(active==='PSX')renderAll(); renderOverview(); });
   $('syncTxt').textContent='Live · synced'; $('syncDot').style.color='var(--up)';
   // ---- SEED once: saara platform data Firebase mein (agar pehle na daala ho) ----
   db.ref('psxShared/m_seed_v2').once('value').then(async snap=>{
@@ -446,10 +448,13 @@ function subscribe(){
 }
 
 /* ---------- computed ---------- */
-function curOf(pos){ return (pos.cur!=null && pos.cur!=='')?+pos.cur:+pos.cost; }
+let psxOverrides={};
+function curOf(pos, id){ id=id||active;
+  if(id==='PSX' && psxOverrides[pos.s]!=null && +psxOverrides[pos.s]>0) return +psxOverrides[pos.s];
+  return (pos.cur!=null && pos.cur!=='')?+pos.cur:+pos.cost; }
 function totals(id){
   const pf=state[id].portfolio, rl=state[id].realized;
-  let inv=0,cur=0; pf.forEach(p=>{ inv+=p.qty*p.cost; cur+=p.qty*curOf(p); });
+  let inv=0,cur=0; pf.forEach(p=>{ inv+=p.qty*p.cost; cur+=p.qty*curOf(p,id); });
   const real=rl.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
   const realM=rl.filter(r=>String(r.date||'').slice(0,7)===nowYM()).reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
   return {inv,cur,pl:cur-inv,real,realM};
@@ -504,7 +509,7 @@ function renderPortfolio(){
   $('sRlz').innerHTML=`<span class="${cls(t.real)}">${t.real>=0?'+':''}${money(t.real)}</span>`;
   // broker/sub-account breakdown (group by platform field)
   const groups={};
-  pf.forEach(p=>{ const g=p.platform||'—'; if(!groups[g])groups[g]={inv:0,cur:0,n:0}; groups[g].inv+=p.qty*p.cost; groups[g].cur+=p.qty*curOf(p); groups[g].n++; });
+  pf.forEach(p=>{ const g=p.platform||'—'; if(!groups[g])groups[g]={inv:0,cur:0,n:0}; groups[g].inv+=p.qty*p.cost; groups[g].cur+=p.qty*curOf(p,active); groups[g].n++; });
   const gk=Object.keys(groups);
   if(gk.length>1){
     $('brokerSum').style.display='';
@@ -522,7 +527,7 @@ function renderPortfolio(){
   $('pfTable').style.display=''; $('pfEmpty').style.display='none';
   $('pfBody').innerHTML=pf.map((p,i)=>{
     if(brokerFilter && (p.platform||'—')!==brokerFilter) return '';
-    const c=curOf(p), inv=p.qty*p.cost, val=p.qty*c, pl=val-inv, plp=inv?pl/inv*100:0;
+    const c=curOf(p,active), inv=p.qty*p.cost, val=p.qty*c, pl=val-inv, plp=inv?pl/inv*100:0;
     return `<tr>
       <td class="l sym"><b>${p.s}</b>${p.notes?`<span>${p.notes}</span>`:''}</td>
       <td>${(+p.qty).toLocaleString('en-US')}</td>
