@@ -442,10 +442,10 @@ function subscribe(){
     }catch(e){ console.warn('seed warn',e); }
   }).catch(e=>console.warn('seed check',e));
   // ---- Capital seed (independent): default capital agar set nahi ----
-  db.ref('psxShared/m_cap_seed_v4').once('value').then(async sn=>{
+  db.ref('psxShared/m_cap_seed_v6').once('value').then(async sn=>{
     if(sn.val()) return;
     try{ for(const cid in DEFAULT_CAPITAL){ const cs=await db.ref(key(cid,'capital')).once('value'); if(!cs.val()) await db.ref(key(cid,'capital')).set(DEFAULT_CAPITAL[cid]); }
-      await db.ref('psxShared/m_cap_seed_v4').set(Date.now()); }catch(e){ console.warn('cap seed',e); }
+      await db.ref('psxShared/m_cap_seed_v6').set(Date.now()); }catch(e){ console.warn('cap seed',e); }
   }).catch(()=>{});
 }
 
@@ -543,18 +543,22 @@ function renderPortfolio(){
   $('sInv').textContent=money(t.inv); $('sCur').textContent=money(t.cur);
   $('sPl').innerHTML=`<span class="${cls(t.pl)}">${t.pl>=0?'+':''}${money(t.pl)}</span>`;
   $('sRlz').innerHTML=`<span class="${cls(t.real)}">${t.real>=0?'+':''}${money(t.real)}</span>`;
-  // broker/sub-account breakdown (group by platform field)
+  // broker/sub-account breakdown (holdings + realized dono se)
   const groups={};
-  pf.forEach(p=>{ const g=p.platform||'—'; if(!groups[g])groups[g]={inv:0,cur:0,n:0}; groups[g].inv+=p.qty*p.cost; groups[g].cur+=p.qty*curOf(p,active); groups[g].n++; });
+  pf.forEach(p=>{ const g=p.platform||'—'; if(!groups[g])groups[g]={inv:0,cur:0,n:0,real:0}; groups[g].inv+=p.qty*p.cost; groups[g].cur+=p.qty*curOf(p,active); groups[g].n++; });
+  state[active].realized.forEach(r=>{ const g=r.platform||'—'; if(!groups[g])groups[g]={inv:0,cur:0,n:0,real:0}; groups[g].real+=(r.sell-r.cost)*r.qty; });
   const gk=Object.keys(groups);
-  if(gk.length>1){
+  const named=gk.filter(g=>g&&g!=='—');
+  if(named.length>=2 || (named.length>=1 && gk.length>=2)){
     $('brokerSum').style.display='';
     const allOn=!brokerFilter;
-    let cards=`<div class="stat" data-broker="__all" style="cursor:pointer;${allOn?'border-color:var(--accent)':''}"><div class="k">All brokers · ${pf.length} pos</div><div class="v" style="font-size:15px">${money(t.cur)}</div><div style="font-size:12px;font-family:var(--mono)" class="${cls(t.pl)}">${t.pl>=0?'+':''}${money(t.pl)}</div></div>`;
-    cards+=gk.map(g=>{const v=groups[g],pl=v.cur-v.inv,plp=v.inv?pl/v.inv*100:0;const on=brokerFilter===g;
+    let cards=`<div class="stat" data-broker="__all" style="cursor:pointer;${allOn?'border-color:var(--accent)':''}"><div class="k">All · ${pf.length} pos</div><div class="v" style="font-size:15px">${money(t.cur)}</div><div style="font-size:12px;font-family:var(--mono)" class="${cls(t.pl)}">${t.pl>=0?'+':''}${money(t.pl)}${t.real?` · <span class="${cls(t.real)}">${t.real>=0?'+':''}${money(t.real)} rlz</span>`:''}</div></div>`;
+    cards+=gk.map(g=>{const v=groups[g],pl=v.cur-v.inv;const on=brokerFilter===g;
+      const main = v.n>0 ? money(v.cur) : (v.real? `<span class="${cls(v.real)}">${v.real>=0?'+':''}${money(v.real)}</span>` : money(0));
+      const sub = v.n>0 ? `${pl>=0?'+':''}${money(pl)}${v.real?` · ${v.real>=0?'+':''}${money(v.real)} rlz`:''}` : (v.real?'realized (booked)':'');
       return `<div class="stat" data-broker="${g}" style="cursor:pointer;${on?'border-color:var(--accent)':''}"><div class="k">${g} · ${v.n} pos</div>
-        <div class="v" style="font-size:15px">${money(v.cur)}</div>
-        <div style="font-size:12px;font-family:var(--mono)" class="${cls(pl)}">${pl>=0?'+':''}${money(pl)} (${plp>=0?'+':''}${plp.toFixed(1)}%)</div></div>`;
+        <div class="v" style="font-size:15px">${main}</div>
+        <div style="font-size:12px;font-family:var(--mono)" class="${v.n>0?cls(pl):''}">${sub}</div></div>`;
     }).join('');
     $('brokerSum').innerHTML=cards;
     $('brokerSum').querySelectorAll('[data-broker]').forEach(el=>el.onclick=()=>{ const b=el.dataset.broker; brokerFilter=(b==='__all')?null:b; renderPortfolio(); });
@@ -1022,8 +1026,23 @@ async function autoPrices(){
   if(!canEdit)return;
   const pf=state[active].portfolio; if(!pf.length){ alert('Is tab mein koi holding nahi.'); return; }
   if(active==='PSX'){
-    // PSX ka free auto reliable nahi (PSX block + mirrors stale) — seedha manual bulk update
-    $('bulkText').value=''; $('bulkModal').classList.add('show');
+    // Robot (TradingView) ki prices Firebase (k_psx_overrides) se laao
+    const btn=$('autoPxBtn'); btn.textContent='⏳ Fetching…'; btn.disabled=true;
+    try{
+      const snap=await db.ref('psxShared/k_psx_overrides').once('value'); const ov=snap.val()||{};
+      const upSnap=await db.ref('psxShared/k_psx_updated').once('value'); const up=upSnap.val();
+      let n=0, fail=[];
+      state.PSX.portfolio.forEach(p=>{ const o=ov[String(p.s).toUpperCase()]; const px=o&&+o.p; if(px>0){ p.cur=px; n++; } else fail.push(p.s); });
+      await save('PSX','portfolio'); renderAll();
+      const ago = up ? (Math.round((Date.now()/1000-up)/3600)+' ghante pehle') : 'robot abhi tak nahi chala';
+      if(n===0){
+        if(!confirm('Robot se koi price nahi mili ('+ago+').\n\nManual bulk-update kholें?')) { btn.textContent='🔄 Auto prices'; btn.disabled=false; return; }
+        $('bulkText').value=''; $('bulkModal').classList.add('show');
+      } else {
+        alert(n+' PSX prices robot (TradingView) se update · '+ago+(fail.length?('.\nNahi mili: '+fail.join(', ')):'. 🎉'));
+      }
+    }catch(e){ alert('Error: '+e.message); }
+    btn.textContent='🔄 Auto prices'; btn.disabled=false;
     return;
   }
   const isCrypto=(active==='BINANCE');
