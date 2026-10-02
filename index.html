@@ -984,9 +984,22 @@ async function autoPrices(){
   if(!canEdit)return;
   const pf=state[active].portfolio; if(!pf.length){ alert('Is tab mein koi holding nahi.'); return; }
   if(active==='PSX'){
-    const up=await (async()=>{ try{ const s=await db.ref('psxShared/k_psx_updated').once('value'); return s.val(); }catch(e){ return null; } })();
-    const ago = up ? Math.round((Date.now()/1000 - up)/3600)+' ghante pehle' : 'abhi tak nahi';
-    alert('PSX prices ROBOT se auto aate hain (daily) — browser se nahi.\n\nLast robot update: '+ago+'.\n\nRobot run karein (GitHub Actions), ya manual ke liye ⇊ Update prices.');
+    const btn=$('autoPxBtn'); btn.textContent='⏳ Fetching…'; btn.disabled=true;
+    let n=0, fail=[];
+    try{
+      const r=await fetch('https://bigbajwatv-alt.github.io/psx-data/daily_summary.json',{cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const j=await r.json();
+      const map={};
+      (j.stocks||[]).forEach(s=>{ if(s.sym){ const px=(s.close!=null&&+s.close>0)?+s.close:(+s.ldcp||0); if(px>0) map[String(s.sym).toUpperCase()]=px; } });
+      state.PSX.portfolio.forEach(p=>{ const px=map[String(p.s).toUpperCase()]; if(px>0){ p.cur=px; n++; } else fail.push(p.s); });
+      await save('PSX','portfolio'); renderAll();
+      const asOf=j.as_of?(' · '+String(j.as_of).slice(0,10)):'';
+      alert(n+' PSX prices update huin'+asOf+(fail.length?('.\nNahi mili (manual karein): '+fail.join(', ')):'. 🎉'));
+    }catch(e){
+      alert('PSX prices fetch nahi hui ('+e.message+').\nManual ke liye: ⇊ Update prices.');
+    }
+    btn.textContent='🔄 Auto prices'; btn.disabled=false;
     return;
   }
   const isCrypto=(active==='BINANCE');
