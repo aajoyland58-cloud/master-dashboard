@@ -570,7 +570,7 @@ function renderPortfolio(){
     const c=curOf(p,active), inv=p.qty*p.cost, val=p.qty*c, pl=val-inv, plp=inv?pl/inv*100:0;
     const hit = p.cost && plp>=ALERT_PCT;
     return `<tr style="${hit?'background:rgba(75,208,122,.10)':''}">
-      <td class="l sym">${hit?'🎯 ':''}<a href="${tvUrl(p.s,active)}" target="_blank" rel="noopener" title="TradingView chart" style="color:inherit;text-decoration:none"><b>${p.s}</b></a>${active==='PSX'?` <a href="https://dps.psx.com.pk/company/${p.s}" target="_blank" rel="noopener" title="PSX page" style="text-decoration:none;font-size:11px;opacity:.65">🅿</a>`:''}${p.notes?`<span>${p.notes}</span>`:''}</td>
+      <td class="l sym">${hit?'🎯 ':''}<b>${p.s}</b> <a href="${tvUrl(p.s,active)}" target="_blank" rel="noopener" title="TradingView chart" style="text-decoration:none;font-size:13px">📈</a>${active==='PSX'?` <a href="https://dps.psx.com.pk/company/${p.s}" target="_blank" rel="noopener" title="PSX page" style="text-decoration:none;font-size:13px">🅿</a>`:''}${p.notes?`<span>${p.notes}</span>`:''}</td>
       <td>${(+p.qty).toLocaleString('en-US')}</td>
       <td>${fmt(p.cost)}</td>
       <td>${fmt(c)}</td>
