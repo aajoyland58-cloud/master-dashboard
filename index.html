@@ -158,6 +158,7 @@
         <div class="stat"><div class="k">Realized P&L (booked)</div><div class="v" id="sRlz">—</div></div>
       </div>
       <div id="brokerSum" class="summary" style="margin-bottom:12px"></div>
+      <div id="alertBanner" style="display:none;margin-bottom:12px"></div>
       <div class="scrollx"><table id="pfTable">
         <thead><tr><th class="l">Stock</th><th>Qty</th><th>Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P/L</th><th>%</th><th class="l">Broker</th><th class="l">Date</th><th class="owner-only">Actions</th></tr></thead>
         <tbody id="pfBody"></tbody>
@@ -424,6 +425,7 @@ function subscribe(){
   });
   // PSX robot prices (k_psx_overrides) — PSX tab auto-price
   db.ref('psxShared/k_psx_overrides').on('value',snap=>{ psxOverrides=snap.val()||{}; if(active==='PSX')renderAll(); renderOverview(); });
+  db.ref('psxShared/m_wa_number').on('value',snap=>{ WA_NUMBER=snap.val()||''; });
   $('syncTxt').textContent='Live · synced'; $('syncDot').style.color='var(--up)';
   // ---- SEED once: saara platform data Firebase mein (agar pehle na daala ho) ----
   db.ref('psxShared/m_seed_v2').once('value').then(async snap=>{
@@ -449,7 +451,38 @@ function subscribe(){
 
 /* ---------- computed ---------- */
 let psxOverrides={};
+const ALERT_PCT=3;   // buy price se itne % growth par alert (3%)
+let WA_NUMBER='';    // WhatsApp number (Firebase se)
+let lastAlertKey='';
+function renderAlertBanner(alerts){
+  const el=$('alertBanner'); if(!el) return;
+  if(!alerts.length){ el.style.display='none'; el.innerHTML=''; return; }
+  const list=alerts.sort((a,b)=>b.g-a.g).map(a=>`${a.s} +${a.g.toFixed(1)}%`).join(' · ');
+  el.style.display='block';
+  el.innerHTML=`<div style="background:rgba(75,208,122,.12);border:1px solid var(--up);border-radius:10px;padding:10px 13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:18px">🎯</span>
+    <div style="flex:1;min-width:160px"><b style="color:var(--up)">${alerts.length} stock${alerts.length>1?'s':''} target zone (+${ALERT_PCT}% ya zyada):</b><br><span style="font-size:12.5px;color:var(--muted)">${list}</span></div>
+    <button class="btn sm primary" id="waBtn" style="background:#25D366;border-color:#25D366">📱 WhatsApp</button>
+  </div>`;
+  const msg=`🎯 PSX/Portfolio Alert (${P().name})\n${alerts.sort((a,b)=>b.g-a.g).map(a=>`${a.s}: +${a.g.toFixed(1)}% (buy ${fmt(a.cost)} → ${fmt(a.cur)})`).join('\n')}\n\n(${ALERT_PCT}%+ growth — profit booking zone)`;
+  $('waBtn').onclick=()=>sendWhatsApp(msg);
+}
+async function sendWhatsApp(msg){
+  if(!WA_NUMBER){
+    const v=prompt('Apna WhatsApp number (country code ke saath, jaise 923001234567):','');
+    if(v===null) return; const num=String(v).replace(/[^0-9]/g,'');
+    if(num.length<10){ alert('Theek number daalein (country code ke saath).'); return; }
+    WA_NUMBER=num; try{ await db.ref('psxShared/m_wa_number').set(num); }catch(e){}
+  }
+  window.open('https://wa.me/'+WA_NUMBER+'?text='+encodeURIComponent(msg),'_blank');
+}
 function curOf(pos, id){ return (pos.cur!=null && pos.cur!=='')?+pos.cur:+pos.cost; }
+function tvUrl(sym,id){
+  sym=encodeURIComponent(String(sym).toUpperCase());
+  if(id==='PSX') return 'https://www.tradingview.com/chart/?symbol=PSX:'+sym;
+  if(id==='BINANCE') return 'https://www.tradingview.com/chart/?symbol=BINANCE:'+sym+'USDT';
+  return 'https://www.tradingview.com/chart/?symbol='+sym;
+}
 function totals(id){
   const pf=state[id].portfolio, rl=state[id].realized;
   let inv=0,cur=0; pf.forEach(p=>{ inv+=p.qty*p.cost; cur+=p.qty*curOf(p,id); });
@@ -528,11 +561,16 @@ function renderPortfolio(){
   } else { $('brokerSum').style.display='none'; $('brokerSum').innerHTML=''; }
   if(!pf.length){ $('pfTable').style.display='none'; $('pfEmpty').style.display='block'; return; }
   $('pfTable').style.display=''; $('pfEmpty').style.display='none';
+  // --- Growth alerts (buy price se +ALERT_PCT ya zyada) ---
+  const alerts=[];
+  pf.forEach(p=>{ const c=curOf(p,active); const g=p.cost?((c-p.cost)/p.cost*100):0; if(g>=ALERT_PCT) alerts.push({s:p.s,g:g,cost:p.cost,cur:c}); });
+  renderAlertBanner(alerts);
   $('pfBody').innerHTML=pf.map((p,i)=>{
     if(brokerFilter && (p.platform||'—')!==brokerFilter) return '';
     const c=curOf(p,active), inv=p.qty*p.cost, val=p.qty*c, pl=val-inv, plp=inv?pl/inv*100:0;
-    return `<tr>
-      <td class="l sym"><b>${p.s}</b>${p.notes?`<span>${p.notes}</span>`:''}</td>
+    const hit = p.cost && plp>=ALERT_PCT;
+    return `<tr style="${hit?'background:rgba(75,208,122,.10)':''}">
+      <td class="l sym">${hit?'🎯 ':''}<a href="${tvUrl(p.s,active)}" target="_blank" rel="noopener" title="TradingView chart" style="color:inherit;text-decoration:none"><b>${p.s}</b></a>${active==='PSX'?` <a href="https://dps.psx.com.pk/company/${p.s}" target="_blank" rel="noopener" title="PSX page" style="text-decoration:none;font-size:11px;opacity:.65">🅿</a>`:''}${p.notes?`<span>${p.notes}</span>`:''}</td>
       <td>${(+p.qty).toLocaleString('en-US')}</td>
       <td>${fmt(p.cost)}</td>
       <td>${fmt(c)}</td>
@@ -984,22 +1022,8 @@ async function autoPrices(){
   if(!canEdit)return;
   const pf=state[active].portfolio; if(!pf.length){ alert('Is tab mein koi holding nahi.'); return; }
   if(active==='PSX'){
-    const btn=$('autoPxBtn'); btn.textContent='⏳ Fetching…'; btn.disabled=true;
-    let n=0, fail=[];
-    try{
-      const r=await fetch('https://bigbajwatv-alt.github.io/psx-data/daily_summary.json',{cache:'no-store'});
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      const j=await r.json();
-      const map={};
-      (j.stocks||[]).forEach(s=>{ if(s.sym){ const px=(s.close!=null&&+s.close>0)?+s.close:(+s.ldcp||0); if(px>0) map[String(s.sym).toUpperCase()]=px; } });
-      state.PSX.portfolio.forEach(p=>{ const px=map[String(p.s).toUpperCase()]; if(px>0){ p.cur=px; n++; } else fail.push(p.s); });
-      await save('PSX','portfolio'); renderAll();
-      const asOf=j.as_of?(' · '+String(j.as_of).slice(0,10)):'';
-      alert(n+' PSX prices update huin'+asOf+(fail.length?('.\nNahi mili (manual karein): '+fail.join(', ')):'. 🎉'));
-    }catch(e){
-      alert('PSX prices fetch nahi hui ('+e.message+').\nManual ke liye: ⇊ Update prices.');
-    }
-    btn.textContent='🔄 Auto prices'; btn.disabled=false;
+    // PSX ka free auto reliable nahi (PSX block + mirrors stale) — seedha manual bulk update
+    $('bulkText').value=''; $('bulkModal').classList.add('show');
     return;
   }
   const isCrypto=(active==='BINANCE');
