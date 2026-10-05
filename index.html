@@ -1081,10 +1081,21 @@ if($('impSellBtn')){
   $('impApply').onclick=async()=>{
     const r=parseImpSells($('impText').value);
     if(!r.length){ alert('Koi valid row nahi mili.'); return; }
-    if(!confirm(`${r.length} sells import karein? Realized ${money(r.reduce((a,x)=>a+x.pnl,0))}`)) return;
-    r.forEach(x=>state[active].realized.unshift(x));
-    await save(active,'realized'); $('impModal').classList.remove('show'); renderAll();
-    alert(r.length+' sells import ho gayin.');
+    if(!confirm(`${r.length} sells import karein? Realized ${money(r.reduce((a,x)=>a+x.pnl,0))}\n(Matching holdings buy-list se khud kam/remove ho jayengi)`)) return;
+    let reduced=0;
+    r.forEach(x=>{
+      state[active].realized.unshift(x);
+      // matching holding kam karo (same symbol; platform match ho to behtar)
+      let idx=state[active].portfolio.findIndex(p=>p.s===x.s && (x.platform? (p.platform||'')===x.platform : true));
+      if(idx<0) idx=state[active].portfolio.findIndex(p=>p.s===x.s);
+      if(idx>=0){ const p=state[active].portfolio[idx];
+        if(p.qty - x.qty > 0.00001){ p.qty=+(p.qty-x.qty); } else { state[active].portfolio.splice(idx,1); }
+        reduced++;
+      }
+    });
+    await save(active,'realized'); await save(active,'portfolio');
+    $('impModal').classList.remove('show'); renderAll();
+    alert(r.length+' sells import ho gayin · '+reduced+' holdings adjust/remove.');
   };
 }
 
