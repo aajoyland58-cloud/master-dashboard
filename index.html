@@ -116,7 +116,10 @@
     <div class="htxt"><h1>Master Portfolio Dashboard</h1><p class="owner-only">All platforms · one place</p></div>
     <div class="hspace"></div>
     <div class="lockbox"><span id="syncDot">●</span> <span id="syncTxt">Connecting…</span>
+      <button class="btn sm" id="backupBtn" title="Saara data JSON mein download (backup)">⬇ Backup</button>
+      <button class="btn sm owner-only" id="restoreBtn" title="Backup JSON se data wapas laayein">⬆ Restore</button>
       <button class="btn sm" id="lockBtn">🔓 Unlock</button></div>
+      <input type="file" id="restoreFile" accept=".json,application/json" style="display:none">
   </header>
 
   <div class="ovstrip" id="ovStrip"></div>
@@ -803,6 +806,42 @@ $('dlSaleBtn').onclick=()=>{
   dl(new Blob(['\ufeff'+csv],{type:'text/csv'}),`${active}-Sale-Journal.csv`);
 };
 function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+
+/* ---------- Backup / Restore (lifetime data safety) ---------- */
+function backupAll(){
+  const dump={ exported_at:new Date().toISOString(), version:1, capital:{}, data:{} };
+  PLATFORMS.forEach(p=>{
+    dump.data[p.id]={ portfolio:state[p.id].portfolio||[], realized:state[p.id].realized||[] };
+    dump.capital[p.id]=state[p.id].capital||0;
+  });
+  const d=new Date(), stamp=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');
+  dl(new Blob([JSON.stringify(dump,null,2)],{type:'application/json'}),'Master-Backup-'+stamp+'.json');
+}
+if($('backupBtn')) $('backupBtn').onclick=backupAll;
+if($('restoreBtn')){
+  $('restoreBtn').onclick=()=>{ if(!canEdit){ alert('Restore ke liye pehle Unlock karein.'); return; } $('restoreFile').click(); };
+  $('restoreFile').addEventListener('change',e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=async()=>{
+      try{
+        const j=JSON.parse(rd.result);
+        if(!j.data) throw new Error('Ye valid backup file nahi.');
+        const cnt=Object.keys(j.data).length;
+        if(!confirm(`Backup (${(j.exported_at||'').slice(0,16)}) restore karein?\n${cnt} platforms ka data MOJOODA data ko replace karega. Pakka?`)){ $('restoreFile').value=''; return; }
+        for(const id in j.data){
+          if(!state[id]) continue;
+          if(Array.isArray(j.data[id].portfolio)){ state[id].portfolio=j.data[id].portfolio; await save(id,'portfolio'); }
+          if(Array.isArray(j.data[id].realized)){ state[id].realized=j.data[id].realized; await save(id,'realized'); }
+          if(j.capital && j.capital[id]!=null){ state[id].capital=+j.capital[id]||0; try{ await db.ref(key(id,'capital')).set(state[id].capital); }catch(_){} }
+        }
+        renderAll(); renderOverview(); alert('✓ Restore ho gaya ('+cnt+' platforms).');
+      }catch(err){ alert('Restore fail: '+err.message); }
+      $('restoreFile').value='';
+    };
+    rd.readAsText(f);
+  });
+}
 
 /* ---------- monthly closure export ---------- */
 $('mcMonth').onchange=renderMcPrev;
