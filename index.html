@@ -116,7 +116,7 @@
     <div class="htxt"><h1>Master Portfolio Dashboard</h1><p class="owner-only">All platforms · one place</p></div>
     <div class="hspace"></div>
     <div class="lockbox"><span id="syncDot">●</span> <span id="syncTxt">Connecting…</span>
-      <button class="btn sm" id="backupBtn" title="Saara data JSON mein download (backup)">⬇ Backup</button>
+      <button class="btn sm owner-only" id="backupBtn" title="Saara data JSON mein download (backup)">⬇ Backup</button>
       <button class="btn sm owner-only" id="restoreBtn" title="Backup JSON se data wapas laayein">⬆ Restore</button>
       <button class="btn sm" id="lockBtn">🔓 Unlock</button></div>
       <input type="file" id="restoreFile" accept=".json,application/json" style="display:none">
@@ -418,7 +418,7 @@ async function save(id,which){
 function subscribe(){
   if(!db){ $('syncTxt').textContent='Offline (no sync)'; $('syncDot').style.color='var(--down)'; return; }
   PLATFORMS.forEach(p=>{
-    ['portfolio','realized','txlog'].forEach(which=>{
+    ['portfolio','realized'].forEach(which=>{    // txlog hata diya (fast load)
       db.ref(key(p.id,which)).on('value',snap=>{
         state[p.id][which]=toArr(snap.val());
         if(p.id===active) renderAll(); renderOverview();
@@ -715,7 +715,15 @@ function renderMcPrev(){
 /* ---------- edit lock ---------- */
 $('lockBtn').onclick=()=>{ if(canEdit){ canEdit=false; document.body.classList.remove('editor'); $('lockBtn').textContent='🔓 Unlock'; renderAll(); } else { $('pinInput').value=''; $('pinModal').classList.add('show'); setTimeout(()=>$('pinInput').focus(),50); } };
 $('pinCancel').onclick=()=>$('pinModal').classList.remove('show');
-$('pinOk').onclick=()=>{ if($('pinInput').value===OWNER_PIN){ canEdit=true; document.body.classList.add('editor'); $('lockBtn').textContent='🔒 Lock'; $('pinModal').classList.remove('show'); renderAll(); } else alert('Ghalat PIN'); };
+$('pinOk').onclick=()=>{ if($('pinInput').value===OWNER_PIN){ canEdit=true; document.body.classList.add('editor'); $('lockBtn').textContent='🔒 Lock'; $('pinModal').classList.remove('show'); renderAll(); setTimeout(()=>{ if(typeof autoRefreshActive==='function') autoRefreshActive(); if(typeof archiveMonthly==='function') archiveMonthly(); },1500); } else alert('Ghalat PIN'); };
+/* ---------- Monthly cloud archive (auto, permanent) ---------- */
+async function archiveMonthly(){
+  if(!canEdit || !db) return;
+  const ym=nowYM();
+  const dump={ at:new Date().toISOString(), capital:{}, data:{} };
+  PLATFORMS.forEach(p=>{ dump.data[p.id]={ portfolio:state[p.id].portfolio||[], realized:state[p.id].realized||[] }; dump.capital[p.id]=state[p.id].capital||0; });
+  try{ await db.ref('psxShared/k_archive/'+ym).set(dump); }catch(e){}
+}
 $('pinInput').addEventListener('keydown',e=>{ if(e.key==='Enter')$('pinOk').click(); });
 
 /* ---------- Add / Edit Buy ---------- */
@@ -1121,6 +1129,36 @@ async function autoPrices(){
   alert(n+' prices update huin'+(fail?(', '+fail+' nahi mili'):'')+'.');
 }
 if($('autoPxBtn')) $('autoPxBtn').onclick=autoPrices;
+
+/* ---------- AUTO-REFRESH (silent, har 5 min) ---------- */
+let lastPxUpdate=0;
+async function autoRefreshActive(){
+  if(!canEdit) return;                  // sirf owner (view-only boss ke liye nahi)
+  const id=active; if(id==='SUMMARY') return;
+  const pf=state[id].portfolio; if(!pf.length) return;
+  try{
+    if(id==='PSX'){
+      const snap=await db.ref('psxShared/k_psx_overrides').once('value'); const ov=snap.val()||{};
+      let n=0; pf.forEach(p=>{ const o=ov[String(p.s).toUpperCase()]; const px=o&&+o.p; if(px>0){ p.cur=px; n++; } });
+      if(n){ await save('PSX','portfolio'); renderAll(); }
+    } else if(id==='BINANCE'){
+      for(const p of pf){ try{ const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+p.s.replace(/USDT$/,'')+'USDT'); if(r.ok){const j=await r.json(); if(+j.price>0)p.cur=+j.price;} }catch(e){} }
+      await save(id,'portfolio'); renderAll();
+    } else if(FINNHUB_KEY){
+      for(const p of pf){ try{ const r=await fetch('https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(p.s)+'&token='+FINNHUB_KEY); if(r.ok){const j=await r.json(); if(+j.c>0)p.cur=+j.c;} }catch(e){} }
+      await save(id,'portfolio'); renderAll();
+    }
+    lastPxUpdate=Date.now(); updateFreshLabel();
+  }catch(e){}
+}
+function updateFreshLabel(){
+  const el=$('syncTxt'); if(!el) return;
+  if(lastPxUpdate){ const m=Math.round((Date.now()-lastPxUpdate)/60000); el.textContent='Live · prices '+(m<1?'abhi':m+'m')+' updated'; }
+}
+// har 5 min active tab ki prices refresh (owner + tab active)
+setInterval(()=>{ if(canEdit && !document.hidden) autoRefreshActive(); }, 5*60*1000);
+// tab switch par bhi (halka) + label har 30s
+setInterval(updateFreshLabel, 30000);
 
 /* ---------- boot ---------- */
 renderTabs(); renderOverview(); renderAll(); subscribe();
