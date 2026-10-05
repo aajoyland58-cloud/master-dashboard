@@ -477,7 +477,7 @@ function renderAlertBanner(alerts){
     <div style="flex:1;min-width:160px"><b style="color:var(--up)">${alerts.length} stock${alerts.length>1?'s':''} target zone (+${ALERT_PCT}% ya zyada):</b><br><span style="font-size:12.5px;color:var(--muted)">${list}</span></div>
     <button class="btn sm primary" id="waBtn" style="background:#25D366;border-color:#25D366">📱 WhatsApp</button>
   </div>`;
-  const msg=`🎯 PSX/Portfolio Alert (${P().name})\n${alerts.sort((a,b)=>b.g-a.g).map(a=>`${a.s}: +${a.g.toFixed(1)}% (buy ${fmt(a.cost)} → ${fmt(a.cur)})`).join('\n')}\n\n(${ALERT_PCT}%+ growth — profit booking zone)`;
+  const msg=`🎯 ${P().name} — Profit Alert (${P().ccy})\n${alerts.sort((a,b)=>b.g-a.g).map(a=>`${a.s}: +${a.g.toFixed(1)}% (buy ${fmt(a.cost)} → ${fmt(a.cur)})`).join('\n')}\n\n(${ALERT_PCT}%+ growth — profit booking zone)`;
   $('waBtn').onclick=()=>sendWhatsApp(msg);
 }
 async function sendWhatsApp(msg){
