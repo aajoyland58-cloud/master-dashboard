@@ -1129,7 +1129,7 @@ async function autoPrices(){
       const snap=await db.ref('psxShared/k_psx_overrides').once('value'); const ov=snap.val()||{};
       const upSnap=await db.ref('psxShared/k_psx_updated').once('value'); const up=upSnap.val();
       let n=0, fail=[];
-      state.PSX.portfolio.forEach(p=>{ const o=ov[String(p.s).toUpperCase()]; const px=o&&+o.p; if(px>0){ p.cur=px; n++; } else fail.push(p.s); });
+      state.PSX.portfolio.forEach(p=>{ if(p.s==='MIF')return; const o=ov[String(p.s).toUpperCase()]; const px=o&&+o.p; if(px>0){ p.cur=px; n++; } else fail.push(p.s); });
       await save('PSX','portfolio'); renderAll();
       const ago = up ? (Math.round((Date.now()/1000-up)/3600)+' ghante pehle') : 'robot abhi tak nahi chala';
       if(n===0){
@@ -1152,6 +1152,7 @@ async function autoPrices(){
   const btn=$('autoPxBtn'); btn.textContent='⏳ Fetching…'; btn.disabled=true;
   let n=0, fail=0;
   for(const p of pf){
+    if(p.s==='MIF')continue;
     try{
       let price=null;
       if(active==='PSX'){
@@ -1189,7 +1190,7 @@ async function autoRefreshActive(){
   try{
     if(id==='PSX'){
       const snap=await db.ref('psxShared/k_psx_overrides').once('value'); const ov=snap.val()||{};
-      let n=0; pf.forEach(p=>{ const o=ov[String(p.s).toUpperCase()]; const px=o&&+o.p; if(px>0){ p.cur=px; n++; } });
+      let n=0; pf.forEach(p=>{ if(p.s==='MIF')return; const o=ov[String(p.s).toUpperCase()]; const px=o&&+o.p; if(px>0){ p.cur=px; n++; } });
       if(n){ await save('PSX','portfolio'); renderAll(); }
     } else if(id==='BINANCE'){
       for(const p of pf){ try{ const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+p.s.replace(/USDT$/,'')+'USDT'); if(r.ok){const j=await r.json(); if(+j.price>0)p.cur=+j.price;} }catch(e){} }
