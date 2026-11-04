@@ -725,7 +725,7 @@ function renderMcPrev(){
 /* ---------- edit lock ---------- */
 $('lockBtn').onclick=()=>{ if(canEdit){ canEdit=false; document.body.classList.remove('editor'); $('lockBtn').textContent='🔓 Unlock'; renderAll(); } else { $('pinInput').value=''; $('pinModal').classList.add('show'); setTimeout(()=>$('pinInput').focus(),50); } };
 $('pinCancel').onclick=()=>$('pinModal').classList.remove('show');
-$('pinOk').onclick=()=>{ if($('pinInput').value===OWNER_PIN){ canEdit=true; document.body.classList.add('editor'); $('lockBtn').textContent='🔒 Lock'; $('pinModal').classList.remove('show'); renderAll(); setTimeout(()=>{ if(typeof autoRefreshActive==='function') autoRefreshActive(); if(typeof archiveMonthly==='function') archiveMonthly(); },1500); } else alert('Ghalat PIN'); };
+$('pinOk').onclick=()=>{ if($('pinInput').value===OWNER_PIN){ canEdit=true; document.body.classList.add('editor'); $('lockBtn').textContent='🔒 Lock'; $('pinModal').classList.remove('show'); renderAll(); setTimeout(()=>{ if(typeof autoRefreshAll==='function') autoRefreshAll(); if(typeof archiveMonthly==='function') archiveMonthly(); },1500); } else alert('Ghalat PIN'); };
 /* ---------- Monthly cloud archive (auto, permanent) ---------- */
 async function archiveMonthly(){
   if(!canEdit || !db) return;
@@ -1183,31 +1183,41 @@ if($('autoPxBtn')) $('autoPxBtn').onclick=autoPrices;
 
 /* ---------- AUTO-REFRESH (silent, har 5 min) ---------- */
 let lastPxUpdate=0;
-async function autoRefreshActive(){
-  if(!canEdit) return;                  // sirf owner (view-only boss ke liye nahi)
-  const id=active; if(id==='SUMMARY') return;
-  const pf=state[id].portfolio; if(!pf.length) return;
+async function refreshPlatform(id){
+  if(id==='SUMMARY') return 0;
+  const pf=state[id]&&state[id].portfolio; if(!pf||!pf.length) return 0;
+  let n=0;
   try{
     if(id==='PSX'){
       const snap=await db.ref('psxShared/k_psx_overrides').once('value'); const ov=snap.val()||{};
-      let n=0; pf.forEach(p=>{ if(p.s==='MIF')return; const o=ov[String(p.s).toUpperCase()]; const px=o&&+o.p; if(px>0){ p.cur=px; n++; } });
-      if(n){ await save('PSX','portfolio'); renderAll(); }
+      pf.forEach(p=>{ if(p.s==='MIF')return; const o=ov[String(p.s).toUpperCase()]; const px=o&&+o.p; if(px>0){ p.cur=px; n++; } });
     } else if(id==='BINANCE'){
-      for(const p of pf){ try{ const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+p.s.replace(/USDT$/,'')+'USDT'); if(r.ok){const j=await r.json(); if(+j.price>0)p.cur=+j.price;} }catch(e){} }
-      await save(id,'portfolio'); renderAll();
+      for(const p of pf){ try{ const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+p.s.replace(/USDT$/,'')+'USDT'); if(r.ok){const j=await r.json(); if(+j.price>0){p.cur=+j.price;n++;}} }catch(e){} }
     } else if(FINNHUB_KEY){
-      for(const p of pf){ try{ const r=await fetch('https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(p.s)+'&token='+FINNHUB_KEY); if(r.ok){const j=await r.json(); if(+j.c>0)p.cur=+j.c;} }catch(e){} }
-      await save(id,'portfolio'); renderAll();
+      for(const p of pf){ if(p.s==='MIF')continue; try{ const r=await fetch('https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(p.s)+'&token='+FINNHUB_KEY); if(r.ok){const j=await r.json(); if(+j.c>0){p.cur=+j.c;n++;}} }catch(e){} }
     }
-    lastPxUpdate=Date.now(); updateFreshLabel();
+    if(n) await save(id,'portfolio');
   }catch(e){}
+  return n;
+}
+async function autoRefreshActive(){
+  if(!canEdit) return;
+  const id=active; if(id==='SUMMARY') return;
+  const n=await refreshPlatform(id);
+  if(n) renderAll();
+  lastPxUpdate=Date.now(); updateFreshLabel();
+}
+async function autoRefreshAll(){        // SAARE brokers (PSX + US + crypto) refresh
+  if(!canEdit) return;
+  for(const pl of PLATFORMS){ await refreshPlatform(pl.id); }
+  renderAll(); lastPxUpdate=Date.now(); updateFreshLabel();
 }
 function updateFreshLabel(){
   const el=$('syncTxt'); if(!el) return;
   if(lastPxUpdate){ const m=Math.round((Date.now()-lastPxUpdate)/60000); el.textContent='Live · prices '+(m<1?'abhi':m+'m')+' updated'; }
 }
 // har 5 min active tab ki prices refresh (owner + tab active)
-setInterval(()=>{ if(canEdit && !document.hidden) autoRefreshActive(); }, 5*60*1000);
+setInterval(()=>{ if(canEdit && !document.hidden) autoRefreshAll(); }, 10*60*1000);
 // tab switch par bhi (halka) + label har 30s
 setInterval(updateFreshLabel, 30000);
 
