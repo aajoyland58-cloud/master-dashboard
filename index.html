@@ -159,6 +159,7 @@
         <div class="stat"><div class="k">Current value</div><div class="v" id="sCur">—</div></div>
         <div class="stat"><div class="k">Total P&L (unrealized)</div><div class="v" id="sPl">—</div></div>
         <div class="stat"><div class="k">Realized P&L (booked)</div><div class="v" id="sRlz">—</div></div>
+        <div class="stat"><div class="k">\ud83d\udcb0 Dividends Received</div><div class="v" id="sDiv">—</div></div>
       </div>
       <div id="brokerSum" class="summary" style="margin-bottom:12px"></div>
       <div id="alertBanner" style="display:none;margin-bottom:12px"></div>
@@ -556,6 +557,8 @@ function renderPortfolio(){
   $('sInv').textContent=money(t.inv); $('sCur').textContent=money(t.cur);
   $('sPl').innerHTML=`<span class="${cls(t.pl)}">${t.pl>=0?'+':''}${money(t.pl)}</span>`;
   $('sRlz').innerHTML=`<span class="${cls(t.real)}">${t.real>=0?'+':''}${money(t.real)}</span>`;
+  const _div=(state[active].realized||[]).filter(r=>r.note==='Dividend').reduce((a,r)=>a+(+r.pnl||0),0);
+  { const el=$('sDiv'); if(el) el.innerHTML = _div? `<span class="pos">+${money(_div)}</span>` : money(0); }
   // broker/sub-account breakdown (holdings + realized dono se)
   const groups={};
   pf.forEach(p=>{ const g=p.platform||'—'; if(!groups[g])groups[g]={inv:0,cur:0,n:0,real:0}; groups[g].inv+=p.qty*p.cost; groups[g].cur+=p.qty*curOf(p,active); groups[g].n++; });
