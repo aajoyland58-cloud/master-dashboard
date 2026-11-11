@@ -681,48 +681,60 @@ async function brAdd(sym){
   const held=(state[active].portfolio||[]).find(p=>String(p.s).toUpperCase()===sym);
   let cmp = held? curOf(held,active) : (last? last.sell : 0);
   let hi=0,lo=0;
-  try{ if(typeof FINNHUB_KEY!=='undefined' && FINNHUB_KEY){ const r=await fetch('https://finnhub.io/api/v1/stock/metric?symbol='+encodeURIComponent(sym)+'&metric=price&token='+FINNHUB_KEY); if(r.ok){const j=await r.json(); hi=+(j.metric&&j.metric['52WeekHigh'])||0; lo=+(j.metric&&j.metric['52WeekLow'])||0; } }
-       const q=await fetch('https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(sym)+'&token='+FINNHUB_KEY); if(q.ok){const jj=await q.json(); if(+jj.c>0) cmp=+jj.c;}
-  }catch(e){}
+  try{ if(typeof FINNHUB_KEY!=='undefined' && FINNHUB_KEY){
+       const q=await fetch('https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(sym)+'&token='+FINNHUB_KEY); if(q.ok){const jj=await q.json(); if(+jj.c>0) cmp=+jj.c; if(+jj.h&&+jj.l){ /* intraday hint */ } }
+       const r=await fetch('https://finnhub.io/api/v1/stock/metric?symbol='+encodeURIComponent(sym)+'&metric=price&token='+FINNHUB_KEY); if(r.ok){const j=await r.json(); hi=+(j.metric&&j.metric['52WeekHigh'])||0; lo=+(j.metric&&j.metric['52WeekLow'])||0; }
+  } }catch(e){}
+  // sanity: discard absurd 52W (e.g. ADR home-currency like KRW) — must be within sane band of CMP
+  if(cmp>0){ if(hi>cmp*8 || hi<cmp*0.2) hi=0; if(lo>cmp*5 || (hi&&lo>hi)) lo=0; }
   const reason=await brReason(sym, cmp, hi, lo);
   buyRecBasket.push({s:sym,cmp:cmp,lastSell:last?last.sell:0,hi:hi,lo:lo,reason:reason});
   brCountUpd();
   alert(sym+' Buy Rec mein add ho gaya ('+buyRecBasket.length+' total)');
 }
 function brOpen(){
-  if(!buyRecBasket.length){ alert('Pehle Sold History se stocks Add karein (search karke "＋ Add to Buy Rec")'); return; }
+  if(!buyRecBasket.length){ alert('Pehle Sold History se stocks Add karein (search karke "\u002b Add to Buy Rec")'); return; }
+  const C={navy:'#16325c',gold:'#c79a2e',green:'#1a7f37',red:'#c1121f',grey:'#f2f5f9',mut:'#667'};
   let rows=buyRecBasket.map((x,i)=>{
-    const downFromSell = x.lastSell>0 ? ((x.cmp-x.lastSell)/x.lastSell*100) : null;
-    const offHigh = x.hi>0 ? ((x.cmp-x.hi)/x.hi*100) : null;
-    return `<tr>
-      <td style="padding:7px 9px;font-weight:700">${x.s}</td>
-      <td style="padding:7px 9px;text-align:right">${fmt(x.cmp)}</td>
-      <td style="padding:7px 9px;text-align:right">${x.lastSell?fmt(x.lastSell):'\u2014'}</td>
-      <td style="padding:7px 9px;text-align:right;color:${downFromSell<0?'#c1121f':'#1a7f37'};font-weight:700">${downFromSell==null?'\u2014':(downFromSell>=0?'+':'')+downFromSell.toFixed(1)+'%'}</td>
-      <td style="padding:7px 9px;text-align:right">${x.hi?fmt(x.hi):'\u2014'}</td>
-      <td style="padding:7px 9px;text-align:right">${x.lo?fmt(x.lo):'\u2014'}</td>
-      <td style="padding:7px 9px;text-align:right;color:#c1121f">${offHigh==null?'\u2014':offHigh.toFixed(0)+'%'}</td>
-      <td style="padding:7px 9px;font-size:12px;color:#444">${x.reason||'\u2014'}</td>
-      <td style="padding:7px 9px"><button class="ic del" data-brdel="${i}">\u2715</button></td>
+    const dS = x.lastSell>0 ? ((x.cmp-x.lastSell)/x.lastSell*100) : null;
+    const oH = x.hi>0 ? ((x.cmp-x.hi)/x.hi*100) : null;
+    const dsCol = dS==null?C.mut:(dS<0?C.red:C.green);
+    let rsn=(x.reason||'\u2014'); // keep on fewer lines
+    const bg = i%2? '#f7f9fc':'#ffffff';
+    return `<tr style="background:${bg}">
+      <td style="padding:9px 10px;border-bottom:1px solid #e8edf3"><span style="font-weight:800;color:${C.navy};font-size:14px">${x.s}</span></td>
+      <td style="padding:9px 10px;text-align:right;border-bottom:1px solid #e8edf3;font-weight:700">$${(+x.cmp).toFixed(2)}</td>
+      <td style="padding:9px 10px;text-align:right;border-bottom:1px solid #e8edf3;color:${C.mut}">${x.lastSell?'$'+(+x.lastSell).toFixed(2):'\u2014'}</td>
+      <td style="padding:9px 10px;text-align:right;border-bottom:1px solid #e8edf3"><span style="display:inline-block;padding:3px 9px;border-radius:12px;font-weight:700;font-size:12px;color:#fff;background:${dS==null?'#aaa':(dS<0?C.red:C.green)}">${dS==null?'\u2014':(dS>=0?'+':'')+dS.toFixed(1)+'%'}</span></td>
+      <td style="padding:9px 10px;text-align:right;border-bottom:1px solid #e8edf3;color:${C.mut}">${x.hi?'$'+(+x.hi).toFixed(2):'\u2014'}</td>
+      <td style="padding:9px 10px;text-align:right;border-bottom:1px solid #e8edf3;color:${C.mut}">${x.lo?'$'+(+x.lo).toFixed(2):'\u2014'}</td>
+      <td style="padding:9px 10px;text-align:right;border-bottom:1px solid #e8edf3;color:${oH==null?C.mut:C.red};font-weight:700">${oH==null?'\u2014':oH.toFixed(0)+'%'}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #e8edf3;font-size:11.5px;color:#334;line-height:1.35;max-width:300px">${rsn}</td>
+      <td style="padding:9px 6px;border-bottom:1px solid #e8edf3;text-align:center"><button class="ic del" data-brdel="${i}">\u2715</button></td>
     </tr>`;}).join('');
-  const html=`<div style="max-width:980px;margin:0 auto">
-    <div style="background:#16325c;color:#fff;padding:16px 20px;border-radius:10px 10px 0 0;border-bottom:4px solid #c79a2e">
-      <div style="font-size:20px;font-weight:800">US Buy Recommendations \u2014 From My Sold History</div>
-      <div style="font-size:12px;color:#cfe0ff;font-style:italic">Re-entry candidates \u00b7 reviewed vs last sell \u00b7 ${new Date().toLocaleDateString()} \u00b7 USD</div>
+  const html=`<div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.3)">
+    <div style="background:${C.navy};color:#fff;padding:18px 22px;border-bottom:5px solid ${C.gold}">
+      <div style="font-size:21px;font-weight:800;letter-spacing:.3px">US Buy Recommendations \u2014 From My Sold History</div>
+      <div style="font-size:12px;color:#cfe0ff;font-style:italic;margin-top:3px">Re-entry candidates \u00b7 reviewed vs last sell \u00b7 ${new Date().toLocaleDateString()} \u00b7 USD</div>
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;background:#fff;color:#111">
-      <thead><tr style="background:#16325c;color:#fff">
-        <th style="padding:8px 9px;text-align:left">Ticker</th><th style="padding:8px 9px;text-align:right">CMP</th>
-        <th style="padding:8px 9px;text-align:right">Last Sell</th><th style="padding:8px 9px;text-align:right">vs Last Sell</th>
-        <th style="padding:8px 9px;text-align:right">52W High</th><th style="padding:8px 9px;text-align:right">52W Low</th>
-        <th style="padding:8px 9px;text-align:right">Off High</th><th style="padding:8px 9px;text-align:left">Reason</th><th></th></tr></thead>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;color:#111;min-width:760px">
+      <thead><tr style="background:${C.navy};color:#fff">
+        <th style="padding:10px;text-align:left;font-size:11px">TICKER</th><th style="padding:10px;text-align:right;font-size:11px">CMP</th>
+        <th style="padding:10px;text-align:right;font-size:11px">LAST SELL</th><th style="padding:10px;text-align:right;font-size:11px">VS LAST SELL</th>
+        <th style="padding:10px;text-align:right;font-size:11px">52W HIGH</th><th style="padding:10px;text-align:right;font-size:11px">52W LOW</th>
+        <th style="padding:10px;text-align:right;font-size:11px">OFF HIGH</th><th style="padding:10px;text-align:left;font-size:11px">REASON (live)</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
-    </table>
-    <div style="font-size:11px;color:#666;padding:10px 4px;font-style:italic">"vs Last Sell" = CMP vs the price you last sold at. "Off High" = CMP vs 52-week high. Verify Shariah (Musaffa/Zoya) & live prices. Informational \u2014 not investment advice.</div>
-    <div style="text-align:right;padding:8px 0"><button class="btn sm" onclick="window.print()">\u2399 Print / Save PDF</button> <button class="btn sm" onclick="buyRecBasket=[];brCountUpd();$(\'brModal\').classList.remove(\'show\')">Clear All</button></div>
+    </table></div>
+    <div style="font-size:10.5px;color:${C.mut};padding:10px 16px;font-style:italic;border-top:1px solid #eee">"Vs Last Sell" = CMP vs your last sell price \u00b7 "Off High" = CMP vs 52-week high \u00b7 Reason auto-sourced (analyst + target + news). Verify Shariah (Musaffa/Zoya) & live prices. Informational \u2014 not investment advice.</div>
+    <div style="text-align:right;padding:12px 16px;background:#f7f9fc;border-top:1px solid #eee">
+      <button class="btn sm primary" onclick="window.print()">\u2399 Print / Save PDF</button>
+      <button class="btn sm" onclick="buyRecBasket=[];brCountUpd();$('brModal').classList.remove('show')">Clear All</button>
+      <button class="btn sm" onclick="$('brModal').classList.remove('show')">Close</button>
+    </div>
   </div>`;
   let m=$('brModal'); if(!m){ m=document.createElement('div'); m.id='brModal'; m.className='modal'; document.body.appendChild(m); }
-  m.innerHTML='<div class="sheet" style="max-width:1040px">'+html+'<div style="text-align:center;margin-top:6px"><button class="btn sm" onclick="$(\'brModal\').classList.remove(\'show\')">Close</button></div></div>';
+  m.innerHTML='<div class="sheet" style="max-width:1000px;padding:0;background:transparent;box-shadow:none">'+html+'</div>';
   m.classList.add('show');
 }
 document.addEventListener('click',e=>{
