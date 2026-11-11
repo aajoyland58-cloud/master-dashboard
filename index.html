@@ -178,6 +178,7 @@
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span id="rlzTot" style="font-size:13px;font-weight:700"></span>
         <input id="rlzSearch" placeholder="🔍 Ticker (MCHP)" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:13px;width:150px"/>
+        <button class="btn sm primary" id="buyRecBtn">🗂 Buy Rec (<span id="brCount">0</span>)</button>
         <button class="btn sm" id="dlSaleBtn">⬇ Sale Journal</button>
         <button class="btn sm primary owner-only" id="impSellBtn">⬆ Import Sells</button>
         <button class="btn sm primary owner-only" id="addSellBtn">＋ Add Sell</button>
@@ -622,6 +623,7 @@ function renderRealized(){
       const n=rows.length;
       cmpEl.style.display='';
       cmpEl.innerHTML=`<b>${q}</b> \u2014 ${n} sell record(s) \u00b7 total realized <span class="${cls(tot)}">${tot>=0?'+':''}${money(tot)}</span> \u00b7 CMP <b id="rlzCmpVal">${held?fmt(curOf(held,active)):'\u2026'}</b>${held?` <span style="color:var(--muted)">(still held: ${(+held.qty).toLocaleString('en-US')})</span>`:' <span style="color:var(--muted)">(fully sold)</span>'}`;
+      cmpEl.innerHTML += ` <button class="btn sm primary" id="brAddBtn" data-br="${q}" style="margin-left:8px">\u002b Add to Buy Rec</button>`;
       if(!held) fetchSearchCmp(q);
     } else cmpEl.style.display='none';
   }
@@ -646,6 +648,88 @@ async function fetchSearchCmp(sym){
     else if(typeof FINNHUB_KEY!=='undefined' && FINNHUB_KEY){ const r=await fetch('https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(sym)+'&token='+FINNHUB_KEY); if(r.ok){const j=await r.json(); const el=$('rlzCmpVal'); if(el&&+j.c>0) el.textContent=fmt(+j.c);} }
   }catch(e){}
 }
+/* ---------- Buy Rec Builder ---------- */
+let buyRecBasket=[];
+// Auto-generate a SHORT, STRONG reason from live sources (news headline + analyst + 52W context)
+async function brReason(sym, cmp, hi, lo){
+  let bits=[];
+  try{
+    if(typeof FINNHUB_KEY!=='undefined' && FINNHUB_KEY){
+      // 1) analyst recommendation (latest)
+      try{ const rr=await fetch('https://finnhub.io/api/v1/stock/recommendation?symbol='+encodeURIComponent(sym)+'&token='+FINNHUB_KEY);
+        if(rr.ok){ const a=await rr.json(); if(a&&a.length){ const t=a[0]; const b=(t.strongBuy||0)+(t.buy||0), h=(t.hold||0), se=(t.sell||0)+(t.strongSell||0);
+          if(b+h+se>0){ const verdict = b>=(h+se)? (b>=2*(h+se)?'Strong Buy':'Buy') : (se>b?'Sell-leaning':'Hold'); bits.push(verdict+' ('+b+'B/'+h+'H/'+se+'S)'); } } } }catch(e){}
+      // 2) price target upside
+      try{ const pt=await fetch('https://finnhub.io/api/v1/stock/price-target?symbol='+encodeURIComponent(sym)+'&token='+FINNHUB_KEY);
+        if(pt.ok){ const p=await pt.json(); if(p&&+p.targetMean>0&&cmp>0){ const up=((p.targetMean-cmp)/cmp*100); bits.push('target $'+p.targetMean.toFixed(0)+' ('+(up>=0?'+':'')+up.toFixed(0)+'%)'); } } }catch(e){}
+      // 3) latest news headline
+      try{ const to=new Date().toISOString().slice(0,10); const from=new Date(Date.now()-14*864e5).toISOString().slice(0,10);
+        const nr=await fetch('https://finnhub.io/api/v1/company-news?symbol='+encodeURIComponent(sym)+'&from='+from+'&to='+to+'&token='+FINNHUB_KEY);
+        if(nr.ok){ const ar=await nr.json(); if(ar&&ar.length&&ar[0].headline){ let hd=ar[0].headline.trim(); if(hd.length>70) hd=hd.slice(0,68)+'\u2026'; bits.push(hd); } } }catch(e){}
+    }
+  }catch(e){}
+  // 4) 52W context fallback/add
+  if(hi>0&&cmp>0){ const off=((cmp-hi)/hi*100); if(off<-15) bits.unshift(Math.abs(off).toFixed(0)+'% below 52W high'); }
+  return bits.length? bits.join(' \u00b7 ') : 'Re-entry candidate \u2014 review live analysis';
+}
+function brCountUpd(){ const el=$('brCount'); if(el) el.textContent=buyRecBasket.length; }
+async function brAdd(sym){
+  sym=String(sym).toUpperCase();
+  if(buyRecBasket.some(x=>x.s===sym)){ alert(sym+' pehle se Buy Rec mein hai'); return; }
+  const sells=(state[active].realized||[]).filter(r=>r.note!=='Dividend' && String(r.s).toUpperCase()===sym);
+  const last=sells.length? sells.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0] : null;
+  const held=(state[active].portfolio||[]).find(p=>String(p.s).toUpperCase()===sym);
+  let cmp = held? curOf(held,active) : (last? last.sell : 0);
+  let hi=0,lo=0;
+  try{ if(typeof FINNHUB_KEY!=='undefined' && FINNHUB_KEY){ const r=await fetch('https://finnhub.io/api/v1/stock/metric?symbol='+encodeURIComponent(sym)+'&metric=price&token='+FINNHUB_KEY); if(r.ok){const j=await r.json(); hi=+(j.metric&&j.metric['52WeekHigh'])||0; lo=+(j.metric&&j.metric['52WeekLow'])||0; } }
+       const q=await fetch('https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(sym)+'&token='+FINNHUB_KEY); if(q.ok){const jj=await q.json(); if(+jj.c>0) cmp=+jj.c;}
+  }catch(e){}
+  const reason=await brReason(sym, cmp, hi, lo);
+  buyRecBasket.push({s:sym,cmp:cmp,lastSell:last?last.sell:0,hi:hi,lo:lo,reason:reason});
+  brCountUpd();
+  alert(sym+' Buy Rec mein add ho gaya ('+buyRecBasket.length+' total)');
+}
+function brOpen(){
+  if(!buyRecBasket.length){ alert('Pehle Sold History se stocks Add karein (search karke "＋ Add to Buy Rec")'); return; }
+  let rows=buyRecBasket.map((x,i)=>{
+    const downFromSell = x.lastSell>0 ? ((x.cmp-x.lastSell)/x.lastSell*100) : null;
+    const offHigh = x.hi>0 ? ((x.cmp-x.hi)/x.hi*100) : null;
+    return `<tr>
+      <td style="padding:7px 9px;font-weight:700">${x.s}</td>
+      <td style="padding:7px 9px;text-align:right">${fmt(x.cmp)}</td>
+      <td style="padding:7px 9px;text-align:right">${x.lastSell?fmt(x.lastSell):'\u2014'}</td>
+      <td style="padding:7px 9px;text-align:right;color:${downFromSell<0?'#c1121f':'#1a7f37'};font-weight:700">${downFromSell==null?'\u2014':(downFromSell>=0?'+':'')+downFromSell.toFixed(1)+'%'}</td>
+      <td style="padding:7px 9px;text-align:right">${x.hi?fmt(x.hi):'\u2014'}</td>
+      <td style="padding:7px 9px;text-align:right">${x.lo?fmt(x.lo):'\u2014'}</td>
+      <td style="padding:7px 9px;text-align:right;color:#c1121f">${offHigh==null?'\u2014':offHigh.toFixed(0)+'%'}</td>
+      <td style="padding:7px 9px;font-size:12px;color:#444">${x.reason||'\u2014'}</td>
+      <td style="padding:7px 9px"><button class="ic del" data-brdel="${i}">\u2715</button></td>
+    </tr>`;}).join('');
+  const html=`<div style="max-width:980px;margin:0 auto">
+    <div style="background:#16325c;color:#fff;padding:16px 20px;border-radius:10px 10px 0 0;border-bottom:4px solid #c79a2e">
+      <div style="font-size:20px;font-weight:800">US Buy Recommendations \u2014 From My Sold History</div>
+      <div style="font-size:12px;color:#cfe0ff;font-style:italic">Re-entry candidates \u00b7 reviewed vs last sell \u00b7 ${new Date().toLocaleDateString()} \u00b7 USD</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;background:#fff;color:#111">
+      <thead><tr style="background:#16325c;color:#fff">
+        <th style="padding:8px 9px;text-align:left">Ticker</th><th style="padding:8px 9px;text-align:right">CMP</th>
+        <th style="padding:8px 9px;text-align:right">Last Sell</th><th style="padding:8px 9px;text-align:right">vs Last Sell</th>
+        <th style="padding:8px 9px;text-align:right">52W High</th><th style="padding:8px 9px;text-align:right">52W Low</th>
+        <th style="padding:8px 9px;text-align:right">Off High</th><th style="padding:8px 9px;text-align:left">Reason</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="font-size:11px;color:#666;padding:10px 4px;font-style:italic">"vs Last Sell" = CMP vs the price you last sold at. "Off High" = CMP vs 52-week high. Verify Shariah (Musaffa/Zoya) & live prices. Informational \u2014 not investment advice.</div>
+    <div style="text-align:right;padding:8px 0"><button class="btn sm" onclick="window.print()">\u2399 Print / Save PDF</button> <button class="btn sm" onclick="buyRecBasket=[];brCountUpd();$(\'brModal\').classList.remove(\'show\')">Clear All</button></div>
+  </div>`;
+  let m=$('brModal'); if(!m){ m=document.createElement('div'); m.id='brModal'; m.className='modal'; document.body.appendChild(m); }
+  m.innerHTML='<div class="sheet" style="max-width:1040px">'+html+'<div style="text-align:center;margin-top:6px"><button class="btn sm" onclick="$(\'brModal\').classList.remove(\'show\')">Close</button></div></div>';
+  m.classList.add('show');
+}
+document.addEventListener('click',e=>{
+  if(e.target&&e.target.id==='brAddBtn'){ brAdd(e.target.getAttribute('data-br')); }
+  if(e.target&&e.target.id==='buyRecBtn'){ brOpen(); }
+  if(e.target&&e.target.hasAttribute&&e.target.hasAttribute('data-brdel')){ buyRecBasket.splice(+e.target.getAttribute('data-brdel'),1); brCountUpd(); brOpen(); }
+});
 
 function renderInc(){
   const t=totals(active);
