@@ -177,12 +177,14 @@
       <div class="p-title"><span class="bar" style="background:var(--gold)"></span>🧾 Sold History — Realized P&amp;L</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span id="rlzTot" style="font-size:13px;font-weight:700"></span>
+        <input id="rlzSearch" placeholder="🔍 Ticker (MCHP)" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:13px;width:150px"/>
         <button class="btn sm" id="dlSaleBtn">⬇ Sale Journal</button>
         <button class="btn sm primary owner-only" id="impSellBtn">⬆ Import Sells</button>
         <button class="btn sm primary owner-only" id="addSellBtn">＋ Add Sell</button>
       </div>
     </div>
     <div class="p-body">
+      <div id="rlzCmp" style="display:none;margin-bottom:10px;padding:10px 12px;border-radius:10px;background:var(--panel,rgba(255,255,255,.04));border:1px solid var(--border);font-size:13px"></div>
       <div class="scrollx"><table id="rlzTable">
         <thead><tr><th class="l">Date</th><th class="l">Stock</th><th>Qty</th><th>Buy</th><th>Sell</th><th>Invested</th><th>Sold for</th><th>Realized</th><th>%</th><th class="owner-only">Del</th></tr></thead>
         <tbody id="rlzBody"></tbody>
@@ -549,6 +551,7 @@ let brokerFilter=null;
 
 /* ---------- render active platform ---------- */
 function renderAll(){ renderPortfolio(); renderRealized(); renderInc(); renderMcMonths(); updateCcyLabels(); }
+document.addEventListener('input',e=>{ if(e.target&&e.target.id==='rlzSearch'){ rlzSearch=e.target.value; renderRealized(); } });
 function updateCcyLabels(){ const c='('+P().ccy+')'; $('pfCcy').textContent=c; $('tgtCcy').textContent=c; }
 
 function renderPortfolio(){
@@ -606,12 +609,25 @@ function renderPortfolio(){
 }
 
 function renderRealized(){
-  const rl=state[active].realized.filter(r=>r.note!=='Dividend');  // dividends alag card mein, Sold History mein nahi
-  const tot=rl.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
-  $('rlzTot').innerHTML=rl.length?`Total: <span class="${cls(tot)}">${tot>=0?'+':''}${money(tot)}</span>`:'';
-  if(!rl.length){ $('rlzTable').style.display='none'; $('rlzEmpty').style.display='block'; return; }
+  const all=state[active].realized||[];
+  const q=(typeof rlzSearch!=='undefined'?rlzSearch:'').trim().toUpperCase();
+  let rows=all.map((r,i)=>({r,i})).filter(x=>x.r.note!=='Dividend');
+  if(q) rows=rows.filter(x=>String(x.r.s).toUpperCase().includes(q));
+  const tot=rows.reduce((a,x)=>a+(x.r.sell-x.r.cost)*x.r.qty,0);
+  $('rlzTot').innerHTML=rows.length?`Total: <span class="${cls(tot)}">${tot>=0?'+':''}${money(tot)}</span>`:'';
+  const cmpEl=$('rlzCmp');
+  if(cmpEl){
+    if(q && rows.length){
+      const held=(state[active].portfolio||[]).find(p=>String(p.s).toUpperCase()===q);
+      const n=rows.length;
+      cmpEl.style.display='';
+      cmpEl.innerHTML=`<b>${q}</b> \u2014 ${n} sell record(s) \u00b7 total realized <span class="${cls(tot)}">${tot>=0?'+':''}${money(tot)}</span> \u00b7 CMP <b id="rlzCmpVal">${held?fmt(curOf(held,active)):'\u2026'}</b>${held?` <span style="color:var(--muted)">(still held: ${(+held.qty).toLocaleString('en-US')})</span>`:' <span style="color:var(--muted)">(fully sold)</span>'}`;
+      if(!held) fetchSearchCmp(q);
+    } else cmpEl.style.display='none';
+  }
+  if(!rows.length){ $('rlzTable').style.display='none'; $('rlzEmpty').style.display='block'; return; }
   $('rlzTable').style.display=''; $('rlzEmpty').style.display='none';
-  $('rlzBody').innerHTML=rl.map((r,i)=>{
+  $('rlzBody').innerHTML=rows.map(({r,i})=>{
     const inv=r.cost*r.qty, sold=r.sell*r.qty, pl=(r.sell-r.cost)*r.qty, roi=inv?pl/inv*100:0;
     return `<tr>
       <td class="l">${r.date||''}</td><td class="l sym"><b>${r.s}</b></td>
@@ -619,9 +635,16 @@ function renderRealized(){
       <td>${money(inv)}</td><td>${money(sold)}</td>
       <td class="${cls(pl)}">${pl>=0?'+':''}${money(pl)}</td>
       <td class="${cls(pl)}">${roi>=0?'+':''}${roi.toFixed(1)}%</td>
-      <td class="owner-only"><button class="ic" data-redit="${i}">✎</button><button class="ic del" data-rdel="${i}">✕</button></td>
+      <td class="owner-only"><button class="ic" data-redit="${i}">\u270e</button><button class="ic del" data-rdel="${i}">\u2715</button></td>
     </tr>`;
   }).join('');
+}
+let rlzSearch='';
+async function fetchSearchCmp(sym){
+  try{
+    if(active==='BINANCE'){ const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+sym.replace(/USDT$/,'')+'USDT'); if(r.ok){const j=await r.json(); const el=$('rlzCmpVal'); if(el&&+j.price>0) el.textContent=fmt(+j.price);} }
+    else if(typeof FINNHUB_KEY!=='undefined' && FINNHUB_KEY){ const r=await fetch('https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(sym)+'&token='+FINNHUB_KEY); if(r.ok){const j=await r.json(); const el=$('rlzCmpVal'); if(el&&+j.c>0) el.textContent=fmt(+j.c);} }
+  }catch(e){}
 }
 
 function renderInc(){
