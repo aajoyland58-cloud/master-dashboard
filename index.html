@@ -606,7 +606,7 @@ function renderPortfolio(){
 }
 
 function renderRealized(){
-  const rl=state[active].realized;
+  const rl=state[active].realized.filter(r=>r.note!=='Dividend');  // dividends alag card mein, Sold History mein nahi
   const tot=rl.reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
   $('rlzTot').innerHTML=rl.length?`Total: <span class="${cls(tot)}">${tot>=0?'+':''}${money(tot)}</span>`:'';
   if(!rl.length){ $('rlzTable').style.display='none'; $('rlzEmpty').style.display='block'; return; }
