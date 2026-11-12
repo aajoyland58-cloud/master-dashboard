@@ -580,7 +580,16 @@ function renderPortfolio(){
   const _capNow=(window.capital&&+window.capital[active])|| (state[active]&&+state[active].capital) || 0;
   const _realSells=(state[active].realized||[]).filter(r=>r.note!=='Dividend').reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
   const _cash=_capNow? (_capNow - t.inv + _realSells) : null;
-  { const ce=$('sCash'); if(ce) ce.innerHTML = _cash!=null? money(_cash) : '\u2014'; }
+  { const ce=$('sCash'); if(ce){
+      const _wd=(active==='PSX' && state.PSX && state.PSX.withdrawals)? state.PSX.withdrawals : [];
+      const _bank=_wd.reduce((a,w)=>a+(+w.amount||0),0);
+      if(_cash==null){ ce.innerHTML='\u2014'; }
+      else if(_bank>0){
+        const _brk=_cash-_bank;
+        const _src=_wd.map(w=>(w.broker||'').replace(' (AHL)','').replace(' (MIF)','')+' '+money(w.amount).replace('Rs ','Rs ')).join(' + ');
+        ce.innerHTML = money(_cash) + '<div style="font-size:11px;font-weight:500;color:var(--muted);margin-top:3px;line-height:1.5">\ud83c\udfe6 <b style="color:var(--gold)">'+money(_bank)+'</b> secured in bank<br>\u00b7 from: '+_src+'<br>\ud83d\udcb5 '+money(_brk)+' remaining at brokers</div>';
+      } else ce.innerHTML=money(_cash);
+  } }
   { const el=$('sDiv'); if(el) el.innerHTML = _div? `<span class="pos">+${money(_div)}</span>` : money(0); }
   // broker/sub-account breakdown (holdings + realized dono se)
   const groups={};
