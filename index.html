@@ -159,7 +159,8 @@
         <div class="stat"><div class="k">Current value</div><div class="v" id="sCur">—</div></div>
         <div class="stat"><div class="k">Total P&L (unrealized)</div><div class="v" id="sPl">—</div></div>
         <div class="stat"><div class="k">Realized P&L (booked)</div><div class="v" id="sRlz">—</div></div>
-        <div class="stat"><div class="k">\ud83d\udcb0 Dividends Received</div><div class="v" id="sDiv">—</div></div>
+        <div class="stat"><div class="k">💰 Dividends Received</div><div class="v" id="sDiv">—</div></div>
+        <div class="stat"><div class="k">🏦 Cash Booked (incl. bank)</div><div class="v" id="sCash">—</div></div>
       </div>
       <div id="brokerSum" class="summary" style="margin-bottom:12px"></div>
       <div id="alertBanner" style="display:none;margin-bottom:12px"></div>
@@ -168,6 +169,21 @@
         <tbody id="pfBody"></tbody>
       </table></div>
       <div class="empty" id="pfEmpty">Abhi koi position nahi. <b>＋ Add Buy</b> se shuru karein.</div>
+    </div>
+  </section>
+
+  <!-- withdrawals to bank (PSX only) -->
+  <section class="panel" id="wdPanel" style="display:none">
+    <div class="p-head">
+      <div class="p-title"><span class="bar" style="background:var(--gold)"></span>🏦 Withdrawals to Bank Account</div>
+      <span id="wdTot" style="font-size:13px;font-weight:700"></span>
+    </div>
+    <div class="p-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Cash transferred out of brokers to the bank (secured). Total Capital remains unchanged \u2014 this records where the recovered cash now sits.</div>
+      <div class="scrollx"><table>
+        <thead><tr><th class="l">Date</th><th class="l">From Broker</th><th class="l">Transferred To</th><th>Amount</th></tr></thead>
+        <tbody id="wdBody"></tbody>
+      </table></div>
     </div>
   </section>
 
@@ -550,7 +566,7 @@ function setTab(id){
 let brokerFilter=null;
 
 /* ---------- render active platform ---------- */
-function renderAll(){ renderPortfolio(); renderRealized(); renderInc(); renderMcMonths(); updateCcyLabels(); }
+function renderAll(){ renderPortfolio(); renderRealized(); renderWithdrawals(); renderInc(); renderMcMonths(); updateCcyLabels(); }
 document.addEventListener('input',e=>{ if(e.target&&e.target.id==='rlzSearch'){ rlzSearch=e.target.value; renderRealized(); } });
 function updateCcyLabels(){ const c='('+P().ccy+')'; $('pfCcy').textContent=c; $('tgtCcy').textContent=c; }
 
@@ -561,6 +577,10 @@ function renderPortfolio(){
   $('sPl').innerHTML=`<span class="${cls(t.pl)}">${t.pl>=0?'+':''}${money(t.pl)}</span>`;
   $('sRlz').innerHTML=`<span class="${cls(t.real)}">${t.real>=0?'+':''}${money(t.real)}</span>`;
   const _div=(state[active].realized||[]).filter(r=>r.note==='Dividend').reduce((a,r)=>a+(+r.pnl||0),0);
+  const _capNow=(window.capital&&+window.capital[active])|| (state[active]&&+state[active].capital) || 0;
+  const _realSells=(state[active].realized||[]).filter(r=>r.note!=='Dividend').reduce((a,r)=>a+(r.sell-r.cost)*r.qty,0);
+  const _cash=_capNow? (_capNow - t.inv + _realSells) : null;
+  { const ce=$('sCash'); if(ce) ce.innerHTML = _cash!=null? money(_cash) : '\u2014'; }
   { const el=$('sDiv'); if(el) el.innerHTML = _div? `<span class="pos">+${money(_div)}</span>` : money(0); }
   // broker/sub-account breakdown (holdings + realized dono se)
   const groups={};
@@ -640,6 +660,18 @@ function renderRealized(){
   }).join('');
 }
 let rlzSearch='';
+function renderWithdrawals(){
+  const el=$('wdPanel'); if(!el) return;
+  const wds=(active==='PSX' && state.PSX && state.PSX.withdrawals)? state.PSX.withdrawals : [];
+  if(!wds.length){ el.style.display='none'; return; }
+  el.style.display='';
+  const tot=wds.reduce((a,w)=>a+(+w.amount||0),0);
+  const te=$('wdTot'); if(te) te.innerHTML=`Total to bank: <span style="color:var(--gold)">${money(tot)}</span>`;
+  const b=$('wdBody'); if(b) b.innerHTML=wds.map(w=>`<tr>
+    <td class="l">${w.date||''}</td><td class="l"><b>${w.broker||''}</b></td>
+    <td class="l">${w.to||'Bank Account'}</td>
+    <td style="text-align:right;font-weight:700;color:var(--gold)">${money(w.amount)}</td></tr>`).join('');
+}
 async function fetchSearchCmp(sym){
   try{
     if(active==='BINANCE'){ const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol='+sym.replace(/USDT$/,'')+'USDT'); if(r.ok){const j=await r.json(); const el=$('rlzCmpVal'); if(el&&+j.price>0) el.textContent=fmt(+j.price);} }
