@@ -187,6 +187,22 @@
     </div>
   </section>
 
+  <!-- buy history (lots) -->
+  <section class="panel" id="buyPanel">
+    <div class="p-head">
+      <div class="p-title"><span class="bar"></span>\U0001f4e5 Buy History \u2014 Lots &amp; Dates</div>
+      <input id="buySearch" placeholder="\U0001f50d Ticker (PANW)" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-size:13px;width:150px"/>
+    </div>
+    <div class="p-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Search a ticker to see each buy lot (date + price) and the blended average \u2014 no need to open the broker statement.</div>
+      <div id="buyAvg" style="display:none;margin-bottom:10px;padding:10px 12px;border-radius:10px;background:var(--panel,rgba(255,255,255,.04));border:1px solid var(--border);font-size:13px"></div>
+      <div class="scrollx"><table id="buyTable">
+        <thead><tr><th class="l">Date</th><th class="l">Stock</th><th>Qty</th><th>Buy Price</th><th>Value</th></tr></thead>
+        <tbody id="buyBody"></tbody>
+      </table></div>
+    </div>
+  </section>
+
   <!-- sold history -->
   <section class="panel">
     <div class="p-head">
@@ -447,7 +463,7 @@ async function save(id,which){
 function subscribe(){
   if(!db){ $('syncTxt').textContent='Offline (no sync)'; $('syncDot').style.color='var(--down)'; return; }
   PLATFORMS.forEach(p=>{
-    ['portfolio','realized','withdrawals'].forEach(which=>{    // withdrawals bhi load
+    ['portfolio','realized','withdrawals','buys'].forEach(which=>{    // withdrawals bhi load
       db.ref(key(p.id,which)).on('value',snap=>{
         state[p.id][which]=toArr(snap.val());
         if(p.id===active) renderAll(); renderOverview();
@@ -566,8 +582,8 @@ function setTab(id){
 let brokerFilter=null;
 
 /* ---------- render active platform ---------- */
-function renderAll(){ renderPortfolio(); renderRealized(); renderWithdrawals(); renderInc(); renderMcMonths(); updateCcyLabels(); }
-document.addEventListener('input',e=>{ if(e.target&&e.target.id==='rlzSearch'){ rlzSearch=e.target.value; renderRealized(); } });
+function renderAll(){ renderPortfolio(); renderRealized(); renderBuys(); renderWithdrawals(); renderInc(); renderMcMonths(); updateCcyLabels(); }
+document.addEventListener('input',e=>{ if(e.target&&e.target.id==='rlzSearch'){ rlzSearch=e.target.value; renderRealized(); } if(e.target&&e.target.id==='buySearch'){ buySearch=e.target.value; renderBuys(); } });
 function updateCcyLabels(){ const c='('+P().ccy+')'; $('pfCcy').textContent=c; $('tgtCcy').textContent=c; }
 
 function renderPortfolio(){
@@ -669,6 +685,32 @@ function renderRealized(){
   }).join('');
 }
 let rlzSearch='';
+let buySearch='';
+function renderBuys(){
+  const el=$('buyPanel'); if(!el) return;
+  const all=(state[active] && state[active].buys)? state[active].buys : [];
+  if(!all.length){ el.style.display='none'; return; }
+  el.style.display='';
+  const q=buySearch.trim().toUpperCase();
+  let rows=all.slice();
+  if(q) rows=rows.filter(b=>String(b.s).toUpperCase().includes(q));
+  rows.sort((a,b)=> String(a.s).localeCompare(String(b.s)) || String(a.date||'').localeCompare(String(b.date||'')));
+  // average box when a single ticker searched
+  const av=$('buyAvg');
+  if(av){
+    if(q && rows.length){
+      const tq=rows.reduce((a,b)=>a+(+b.qty||0),0);
+      const tv=rows.reduce((a,b)=>a+(+b.qty||0)*(+b.price||0),0);
+      const avg=tq? tv/tq : 0;
+      av.style.display='';
+      av.innerHTML=`<b>${q}</b> \u2014 ${rows.length} lot(s) \u00b7 total <b>${(+tq).toLocaleString('en-US')}</b> sh \u00b7 blended avg <b style="color:var(--gold)">${fmt(avg)}</b>`;
+    } else av.style.display='none';
+  }
+  $('buyBody').innerHTML=rows.map(b=>`<tr>
+    <td class="l">${b.date||'\u2014'}</td><td class="l sym"><b>${b.s}</b>${b.note?' <span style="font-size:10px;color:var(--muted)">('+b.note+')</span>':''}</td>
+    <td>${(+b.qty).toLocaleString('en-US')}</td><td>${fmt(b.price)}</td>
+    <td>${money((+b.qty)*(+b.price))}</td></tr>`).join('');
+}
 function renderWithdrawals(){
   const el=$('wdPanel'); if(!el) return;
   const wds=(active==='PSX' && state.PSX && state.PSX.withdrawals)? state.PSX.withdrawals : [];
@@ -798,7 +840,7 @@ async function archiveMonthly(){
   if(!canEdit || !db) return;
   const ym=nowYM();
   const dump={ at:new Date().toISOString(), capital:{}, data:{} };
-  PLATFORMS.forEach(p=>{ dump.data[p.id]={ portfolio:state[p.id].portfolio||[], realized:state[p.id].realized||[], withdrawals:state[p.id].withdrawals||[] }; dump.capital[p.id]=state[p.id].capital||0; });
+  PLATFORMS.forEach(p=>{ dump.data[p.id]={ portfolio:state[p.id].portfolio||[], realized:state[p.id].realized||[], withdrawals:state[p.id].withdrawals||[], buys:state[p.id].buys||[] }; dump.capital[p.id]=state[p.id].capital||0; });
   try{ await db.ref('psxShared/k_archive/'+ym).set(dump); }catch(e){}
 }
 $('pinInput').addEventListener('keydown',e=>{ if(e.key==='Enter')$('pinOk').click(); });
@@ -896,7 +938,7 @@ function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createOb
 function backupAll(){
   const dump={ exported_at:new Date().toISOString(), version:1, capital:{}, data:{} };
   PLATFORMS.forEach(p=>{
-    dump.data[p.id]={ portfolio:state[p.id].portfolio||[], realized:state[p.id].realized||[], withdrawals:state[p.id].withdrawals||[] };
+    dump.data[p.id]={ portfolio:state[p.id].portfolio||[], realized:state[p.id].realized||[], withdrawals:state[p.id].withdrawals||[], buys:state[p.id].buys||[] };
     dump.capital[p.id]=state[p.id].capital||0;
   });
   const d=new Date(), stamp=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');
@@ -919,6 +961,7 @@ if($('restoreBtn')){
           if(Array.isArray(j.data[id].portfolio)){ state[id].portfolio=j.data[id].portfolio; await save(id,'portfolio'); }
           if(Array.isArray(j.data[id].realized)){ state[id].realized=j.data[id].realized; await save(id,'realized'); }
           if(Array.isArray(j.data[id].withdrawals)){ state[id].withdrawals=j.data[id].withdrawals; await save(id,'withdrawals'); }
+          if(Array.isArray(j.data[id].buys)){ state[id].buys=j.data[id].buys; await save(id,'buys'); }
           if(j.capital && j.capital[id]!=null){ state[id].capital=+j.capital[id]||0; try{ await db.ref(key(id,'capital')).set(state[id].capital); }catch(_){} }
         }
         renderAll(); renderOverview(); alert('✓ Restore ho gaya ('+cnt+' platforms).');
